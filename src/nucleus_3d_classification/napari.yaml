@@ -1,0 +1,57 @@
+name: cell-classification
+display_name: Cell Classifier
+# use 'hidden' to remove plugin from napari hub search results
+visibility: public
+# see https://napari.org/stable/plugins/manifest.html for valid categories
+categories: ["Annotation", "Segmentation", "Acquisition"]
+contributions:
+  commands:
+    - id: cell-classification.get_reader
+      python_name: nucleus_3d_classification._reader:napari_get_reader
+      title: Open data with Cell Classifier
+    - id: cell-classification.write_multiple
+      python_name: nucleus_3d_classification._writer:write_multiple
+      title: Save multi-layer data with Cell Classifier
+    - id: cell-classification.write_single_image
+      python_name: nucleus_3d_classification._writer:write_single_image
+      title: Save image data with Cell Classifier
+    - id: cell-classification.make_sample_data
+      python_name: nucleus_3d_classification._sample_data:make_sample_data
+      title: Load sample data from Cell Classifier
+    - id: cell-classification.make_container_widget
+      python_name: nucleus_3d_classification:ImageThreshold
+      title: Make threshold Container widget
+    - id: cell-classification.make_magic_widget
+      python_name: nucleus_3d_classification:threshold_magic_widget
+      title: Make threshold magic widget
+    - id: cell-classification.make_function_widget
+      python_name: nucleus_3d_classification:threshold_autogenerate_widget
+      title: Make threshold function widget
+    - id: cell-classification.make_qwidget
+      python_name: nucleus_3d_classification:ExampleQWidget
+      title: Make example QWidget
+  readers:
+    - command: cell-classification.get_reader
+      accepts_directories: false
+      filename_patterns: ['*.npy']
+  writers:
+    - command: cell-classification.write_multiple
+      layer_types: ['image*','labels*']
+      filename_extensions: []
+    - command: cell-classification.write_single_image
+      layer_types: ['image']
+      filename_extensions: ['.npy']
+  sample_data:
+    - command: cell-classification.make_sample_data
+      display_name: Cell Classifier
+      key: unique_id.1
+  widgets:
+    - command: cell-classification.make_container_widget
+      display_name: Container Threshold
+    - command: cell-classification.make_magic_widget
+      display_name: Magic Threshold
+    - command: cell-classification.make_function_widget
+      autogenerate: true
+      display_name: Autogenerate Threshold
+    - command: cell-classification.make_qwidget
+      display_name: Example QWidget
