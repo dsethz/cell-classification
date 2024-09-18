@@ -2,7 +2,7 @@
 
 import torch.nn.functional as F
 
-class resize:
+class pad:
     def __init__(self, target_size):
         self.target_size = target_size
     

@@ -16,8 +16,17 @@ import torch
 
 from lightning.pytorch.cli import LightningCLI
 
+from models.ResNet import ResNet, Block
+
 def cli_main():
     cli = LightningCLI()
 
 if __name__ == '__main__':
-    cli_main()
+    # cli_main()
+    model = ResNet(block=Block, layers=[1,1,1,1], num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
+        #print(model)
+
+    tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    output = model(tensor)
+    print(output.shape)
+    #print(output)
