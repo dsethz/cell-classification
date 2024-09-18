@@ -18,3 +18,4 @@ dependencies:
   - ipykernel # for jupyter notebook
   - lightning=2.3.3
   - joblib # For parallel runs, RF.
+  - lightning[pytorch-extra] # For LightningCLI
