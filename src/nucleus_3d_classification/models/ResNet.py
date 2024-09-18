@@ -53,9 +53,10 @@ class ResNet(L.LightningModule):
         '''
         This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
         The default parameters are the same as in the Pytorch implementation of ResNet at https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py,
-        checked at 2024-09-18, however, the model is adapted to 3D data. Additionally, the model can be modified to have a different number of layers in each block,
-        by changing the layers parameter, as well as allowing the ceil_mode parameter to be set to True or False for the max pooling layer. An extra padding layer
-        can be added after the max pooling layer to ensure that the data is the correct size for the first residual block.
+        checked at 2024-09-18, using the stride for downsampling at the second 3x3x3 convolution, additionally, the model is adapted to work with 3D data.
+        The model can be modified to have a different number of layers in each block, by changing the layers parameter, as well as allowing the ceil_mode
+        parameter to be set to True or False for the max pooling layer (for odd inputs). An extra padding layer can be added after the max pooling layer
+        to ensure that the data is the correct size for the first residual block.
         '''
 
         # Variables
@@ -152,6 +153,30 @@ class ResNet(L.LightningModule):
     
     def print_model(self):
         print(self)
+
+def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None):
+    '''
+    This function creates a ResNet50 model with the specified number of classes and image channels.
+    The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
+    and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
+    '''
+    return ResNet(block=Block, layers=[3,4,6,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes)
+
+def ResNet101(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None):
+    '''
+    This function creates a ResNet101 model with the specified number of classes and image channels.
+    The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
+    and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
+    '''
+    return ResNet(block=Block, layers=[3,4,23,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes)
+
+def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None):
+    '''
+    This function creates a ResNet152 model with the specified number of classes and image channels.
+    The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
+    and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
+    '''
+    return ResNet(block=Block, layers=[3,8,36,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes)
 
 ######################################################################################################################
 

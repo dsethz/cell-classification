@@ -13,12 +13,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from padding import pad
 
-
 # LightningDataModule to handle dataset and dataloading logic
 class CustomDataModule(pl.LightningDataModule):
     def __init__(self, root_dir, crop_dir, label_dir, target_size, batch_size: int = 16, num_workers=0,
                  train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'], test_image_names='c0_0-55'): 
-        # TODO: # Change the default to None later
+                    # TODO: # Change the default to None later
         super().__init__()
         self.root_dir = root_dir
         self.crop_dir = crop_dir
@@ -56,7 +55,10 @@ class CustomDataModule(pl.LightningDataModule):
         directory_list = sorted([d for d in os.listdir(f'{self.crop_dir}') if 'cutout' in d])
         for label_name in labels_dict.keys():
             for directory in directory_list:
-                if str(label_name).split('.')[0] in directory:
+                if str(label_name).split('.')[0] in directory: 
+                    # Check if label file name is in directory name
+                    # This is a hacky way to match the label file with the image directory
+                    # TODO: Change this to a more robust method, e.g. using metadata
                     label_to_directory[label_name] = directory
         
         # Filter labels with necessary information
@@ -75,17 +77,22 @@ class CustomDataModule(pl.LightningDataModule):
             self.labels[name] = []
 
             for image in os.listdir(f'{self.crop_dir}{image_dir}'):
+                # THIS ASSUMES CROPS ARE IN A FOLDER, WHICH HAS SUBFOLDERS FOR EACH IMAGE WITH THE CROPS
                 if image.endswith('.tif'):
                     mask_id = (image.split('.')[0].split('_')[-1])
-                    if mask_id not in new_labels_dict[label_file].keys():
+                    if mask_id not in new_labels_dict[label_file].keys(): # Skip if mask_id not in labels
                         continue
                     label = new_labels_dict[label_file][mask_id]
-                    if label != 'unknown':
+                    if label != 'unknown': # Skip if label is unknown
+
                         loaded_image = tiff.imread(f'{self.crop_dir}{image_dir}/{image}')
-                        loaded_image = torch.from_numpy(loaded_image).float()
+                        loaded_image = torch.from_numpy(loaded_image).float() # Convert to tensor
                         if self.transform:
                             loaded_image = self.transform(loaded_image)
+                            # Add dummy channel dimension
+                            loaded_image = loaded_image.unsqueeze(0)
                         self.intensities[name].append(loaded_image)
+
                         # Change label to binary, 0 if negative, 1 if positive
                         label_onehot = 1 if label == 'megakaryocytic' else 0
                         self.labels[name].append(int(label_onehot))
@@ -93,8 +100,8 @@ class CustomDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         # Convert intensities and labels to tensors during setup
         if stage == 'fit' or stage is None:
-            if len(self.train_image_names) == 1:
-                self.train_data = list(zip(self.intensities[self.train_image_name], self.labels[self.train_image_name]))
+            if isinstance(self.train_image_names, str):
+                self.train_data = list(zip(self.intensities[self.train_image_names], self.labels[self.train_image_names]))
             elif len(self.train_image_names) > 1:
                 train_intensities = []
                 train_labels = []
@@ -104,16 +111,19 @@ class CustomDataModule(pl.LightningDataModule):
                 self.train_data = list(zip(train_intensities, train_labels))
 
         if stage == 'validate' or stage is None:
-            val_intensities = []
-            val_labels = []
-            for val_image_name in self.val_image_names:
-                val_intensities += self.intensities[val_image_name]
-                val_labels += self.labels[val_image_name]
-            self.val_data = list(zip(val_intensities, val_labels))
+            if isinstance(self.val_image_names, str):
+                self.val_data = list(zip(self.intensities[self.val_image_names], self.labels[self.val_image_names]))
+            elif len(self.val_image_names) > 1:
+                val_intensities = []
+                val_labels = []
+                for val_image_name in self.val_image_names:
+                    val_intensities += self.intensities[val_image_name]
+                    val_labels += self.labels[val_image_name]
+                self.val_data = list(zip(val_intensities, val_labels))
 
         if stage == 'test' or stage is None:
-            if len(self.test_image_names) == 1:
-                self.test_data = list(zip(self.intensities[self.test_image_name], self.labels[self.test_image_name]))
+            if isinstance(self.test_image_names, str):
+                self.test_data = list(zip(self.intensities[self.test_image_names], self.labels[self.test_image_names]))
             elif len(self.test_image_names) > 1:
                 test_intensities = []
                 test_labels = []
@@ -155,9 +165,10 @@ data_module = CustomDataModule(
     test_image_names='c0_0-55'  # Default value
 )
 
+
 # Prepare data and loaders
 data_module.prepare_data()
-data_module.setup(stage='validate')
+data_module.setup(stage=None)
 
 # Get the train, validation, and test loaders
 train_loader = data_module.train_dataloader()
@@ -165,6 +176,6 @@ val_loader = data_module.val_dataloader()
 test_loader = data_module.test_dataloader()
 
 # Sanity check, print the first batch of images and labels using the show_slice function
-images, labels = next(iter(val_loader))
+images, labels = next(iter(train_loader))
 
 print(images.shape)
