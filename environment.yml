@@ -19,3 +19,4 @@ dependencies:
   - lightning=2.3.3
   - joblib # For parallel runs, RF.
   - lightning[pytorch-extra] # For LightningCLI
+  - pandas # For data manipulation vers 2.2.2
