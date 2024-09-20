@@ -82,3 +82,5 @@ venv/
 
 # written by setuptools_scm
 **/_version.py
+/src/nucleus_3d_classification/data
+src/nucleus_3d_classification/structuremain.py

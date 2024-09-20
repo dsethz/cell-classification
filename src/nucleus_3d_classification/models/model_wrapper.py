@@ -8,16 +8,18 @@ class lightning_model(L.LightningModule):
         super().__init__()
 
         self.model = model
-        self.save_hyperparameters = save_hyperparameters
         self.learning_rate = learning_rate
         self.loss_fn = loss_fn
+
+        if save_hyperparameters:
+            self.save_hyperparameters()
         
 
     def forward(self, x):
         x = self.model(x)
         return x
     
-    def training_step(self, batch, batch_idx, loss_fn):
+    def training_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
         x, y = batch
         y_hat = self.model(x)
@@ -25,42 +27,48 @@ class lightning_model(L.LightningModule):
         self.log('training_loss', loss)
         return loss
     
-    def validation_step(self, batch, batch_idx, loss_fn):
+    def validation_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
         x, y = batch
         y_hat = self.model(x)
         val_loss = loss_fn(y_hat, y)
 
-        # Calculate accuracy, precision, recall #TODO: Fix this.
-        acc = (x.argmax(dim=1) == y).float().mean()
-        precision = (x.argmax(dim=1) == y).float().mean()
-        recall = (x.argmax(dim=1) == y).float().mean()
         
-        values = {"val_loss": val_loss, "val_accuracy": acc, "val_precision": precision, "val_recall": recall}
+        # TODO: Fix this
+        # y_pred = y_hat.argmax(dim=1)
 
-        # Log the validation loss
-        self.log_dict(values, on_epoch=True,
-                prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+
+        # # Calculate accuracy, precision, recall
+        # acc = (x.argmax(dim=1) == y).float().mean()
+        # precision = (x.argmax(dim=1) == y).float().mean()
+        # recall = (x.argmax(dim=1) == y).float().mean()
+        
+        # values = {"val_loss": val_loss, "val_accuracy": acc, "val_precision": precision, "val_recall": recall}
+
+        # # Log the validation loss
+        # self.log_dict(values, on_epoch=True,
+        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
 
         return val_loss
     
-    def test_step(self, batch, batch_idx, loss_fn):
+    def test_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
 
         x, y = batch
         y_hat = self.model(x)
         Test_step_loss = loss_fn(y_hat, y)
 
-        # Calculate accuracy, precision, recall # TODO: Check if this is correct
-        test_acc = (x.argmax(dim=1) == y).float().mean()
-        test_precision = (x.argmax(dim=1) == y).float().mean()
-        test_recall = (x.argmax(dim=1) == y).float().mean()
+        # TODO: Fix this
+        # # Calculate accuracy, precision, recall
+        # test_acc = (x.argmax(dim=1) == y).float().mean()
+        # test_precision = (x.argmax(dim=1) == y).float().mean()
+        # test_recall = (x.argmax(dim=1) == y).float().mean()
         
-        values = {"test_loss": Test_step_loss, "test_accuracy": test_acc, "test_precision": test_precision, "test_recall": test_recall}
+        # values = {"test_loss": Test_step_loss, "test_accuracy": test_acc, "test_precision": test_precision, "test_recall": test_recall}
 
-        # Log the validation loss
-        self.log_dict(values,
-                prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+        # # Log the validation loss
+        # self.log_dict(values,
+        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
 
         return Test_step_loss
     
