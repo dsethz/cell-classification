@@ -12,6 +12,7 @@ import sys
 from typing import List, Optional
 import argparse
 import lightning as L
+import pytorch_lightning as pl
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
@@ -21,7 +22,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch
-from models.BaseNNModels import BaseNNModel, BaseNNModel2, Block
+
+from utils.testdatamodule import BaseDataModule
+from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
 
 import argparse
 import os
@@ -31,55 +34,7 @@ from datetime import datetime
 import pytorch_lightning as pl
 import torch
 
-from lightning.pytorch.cli import LightningCLI
-
-from models import model_wrapper
-from models.ResNet import ResNet, Block
-from models.testmodels import BaseNNModel, BaseNNModel2, testBlock
-
-
-class BaseDataModule(L.LightningDataModule):
-    def __init__(self, data_dir: str = "./data", batch_size: int = 32):
-        super().__init__()
-        self.data_dir = data_dir
-        self.batch_size = batch_size
-
-        # These will be set in the setup() method
-        self.train_dataset = None
-        self.val_dataset = None
-        self.test_dataset = None
-
-    def setup(self, stage: Optional[str] = None):
-        # Generate random synthetic data: 1000 samples, 10 features
-        num_samples = 1000
-        num_features = 10
-        num_classes = 2
-
-        # Create random tensors for features (X) and labels (y)
-        X = torch.randn(num_samples, num_features)
-        y = torch.randint(0, num_classes, (num_samples,))
-
-        # Wrap data into a TensorDataset
-        dataset = TensorDataset(X, y)
-
-        # Split into training, validation, and test datasets
-        train_size = int(0.7 * len(dataset))
-        val_size = int(0.15 * len(dataset))
-        test_size = len(dataset) - train_size - val_size
-
-        self.train_dataset, self.val_dataset, self.test_dataset = random_split(dataset, [train_size, val_size, test_size])
-
-    def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=True)
-
-    def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size)
-
-    def predict_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size)  # Example: using test dataset for prediction
+from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet, Block, ResNet_custom_layers
 
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
@@ -101,14 +56,25 @@ def get_model(model_name: str, class_weight: Optional[str] = None, max_iter: int
     elif model_name == "logreg":
         return SklearnModelWrapper(LogisticRegression(class_weight=class_weight, max_iter=max_iter))
 
-def get_nn_model(model_name: str):
-    if model_name == "BaseNNModel":
-        return BaseNNModel()
-    elif model_name == "BaseNNModel2":
-        parser.add_argument("--layers", type=int, default=3, help="Number of layers to use")
-        extra_args = parser.parse_args(args)  # Reparse with additional options
+def get_nn_model(model_name: str, extra_args: dict = None):
 
-        return BaseNNModel2(Block=Block, layers=extra_args.layers) # TODO: Fix this, so we can pass in layers
+    if extra_args is None:
+        extra_args = {}
+
+    print(f"Creating model: {model_name} with extra_args: {extra_args}")
+
+    if model_name == "BaseNNModel":
+        model = get_BaseNNModel()
+        print(f'Created model instance: {model}')
+        print(f'Model is of type: {type(model)}')
+        return model
+    elif model_name == "BaseNNModel2":
+        if 'Block' not in extra_args or 'layers' not in extra_args:
+            raise ValueError("BaseNNModel2 requires 'Block' and 'layers' in extra_args.")
+
+        model = get_BaseNNModel2(extra_args['Block'], extra_args['layers'])
+
+        return model
 
 def load_data(data_dir:str, data_file: str, target: str):
     # Implement data loading for RF and LogReg
@@ -181,11 +147,15 @@ def main(args: List[str] = None):
     parsed_args, remaining_args = parser.parse_known_args(args)
 
     if parsed_args.model_type == 'nn':
-        
+        ResNet_implemented = ['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers']
+        testmodels_implemented = ['BaseNNModel', 'BaseNNModel2']
+
+        all_implemented = ResNet_implemented + testmodels_implemented
+
         parser.add_argument("--batch_size", type=int, default=32, help="Batch size to use")
         parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
         parser.add_argument("--profiler", type=bool, default=False, help="Enable the PyTorch Lightning profiler")
-        parser.add_argument("--model_class", type=str, choices=("BaseNNModel", "BaseNNModel2"), help="Name of the model to use")
+        parser.add_argument("--model_class", type=str, choices=all_implemented, default='BaseNNModel2', help="Name of the model to use")
 
         if parsed_args.command == 'train':
         # Additional arguments for Lightning models
@@ -193,8 +163,47 @@ def main(args: List[str] = None):
 
             parsed_args = parser.parse_args(args)  # Reparse with additional options
             
-            model = get_nn_model(parsed_args.model_class)
+            # If model_class is a ResNet model, we need to parse additional arguments
+            if parsed_args.model_class in ResNet_implemented:
+                parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
+                parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
+                parser.add_argument("--padding_layer_sizes", type=tuple, default=(2,2,4,3,20,19), help="Padding layer sizes for the ResNet model")
+                if parsed_args.model_class == 'ResNet_custom_layers':
+                    parser.add_argument("--layers", type=int, default=[1,1,1,1], help="Number of layers to use")
+                extra_args = parser.parse_args(args)
 
+                padding_layer_sizes = extra_args.padding_layer_sizes
+                if len(padding_layer_sizes) != 6:
+                    raise ValueError("Padding layer sizes must be a tuple of 6 integers")
+                
+                num_classes = extra_args.num_classes
+                image_channels = extra_args.image_channels
+                layers = extra_args.layers
+
+                extra_args = {
+                "Block": Block if Block is not None else testBlock,
+                "layers": layers if layers is not None else [1,1,1,1],
+                "num_classes": num_classes if num_classes is not None else 2,
+                "image_channels": image_channels if image_channels is not None else 1,
+                "padding_layer_sizes": padding_layer_sizes if padding_layer_sizes is not None else (2,2,4,3,20,19)
+                }
+
+                model = get_nn_model(parsed_args.model_class, extra_args = extra_args)
+            
+            if parsed_args.model_class == 'BaseNNModel':
+                model = get_nn_model(parsed_args.model_class)
+            
+            if parsed_args.model_class == 'BaseNNModel2':
+                parser.add_argument("--layers", type=int, default=3, help="Number of layers to use")
+                extra_args = parser.parse_args(args)  # Reparse with additional options
+                layers = extra_args.layers
+
+                extra_args = {
+                "Block": testBlock if testBlock is not None else Block,
+                "layers": layers if layers is not None else 3,
+                }
+                model = get_nn_model(parsed_args.model_class, extra_args = extra_args)
+            
             # Load the data module
             if parsed_args.data_module == 'BaseDataModule':
                 data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
@@ -213,6 +222,8 @@ def main(args: List[str] = None):
 
             print("Parsed arguments for train:", parsed_args)
 
+            assert model is not None, "Model is None"
+            
             trainer.fit(model, datamodule=data_module)
 
         elif parsed_args.command == 'predict':
@@ -299,19 +310,22 @@ def main(args: List[str] = None):
             predictions = predict(model, X, save_name=parsed_args.save_name, save_type=parsed_args.save_type)
             print(predictions)
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # model2 = BaseNNModel2(Block=Block)
     # print(model2)
 
     # x = torch.randn(10)
     # print(model2(x).shape)
 
-    model = ResNet(block=Block, layers=[1,1,1,1], num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
-    #print(model)
+    # model = ResNet(block=Block, layers=[1,1,1,1], num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
+    # #print(model)
 
-    tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
-    output = model(tensor)
-    print(output.shape)
+    # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    # output = model(tensor)
+    # print(output.shape)
     #print(output)
 
     # main()
+
+if __name__ == "__main__":
+    main()

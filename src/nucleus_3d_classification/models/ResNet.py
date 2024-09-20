@@ -93,7 +93,7 @@ class ResNet(L.LightningModule):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    # def forward(self, x):
+    # def forward(self, x): # Uncomment this and comment the next one to use the original forward function, without print statements
     #     x = self.conv1(x)
     #     x = self.bn1(x)
     #     x = self.relu(x)
@@ -153,6 +153,15 @@ class ResNet(L.LightningModule):
     
     def print_model(self):
         print(self)
+
+def ResNet_custom_layers(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, layers=[1,1,1,1]):
+    '''
+    This function creates a ResNet model with the specified number of classes and image channels.
+    The layers parameter can be used to specify the number of layers in each block.
+    The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
+    and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
+    '''
+    return ResNet(block=Block, layers=layers, num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes)
 
 def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None):
     '''

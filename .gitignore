@@ -84,3 +84,4 @@ venv/
 **/_version.py
 /src/nucleus_3d_classification/data
 src/nucleus_3d_classification/structuremain.py
+/src/lightning_logs
