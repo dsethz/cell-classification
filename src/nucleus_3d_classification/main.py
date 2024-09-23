@@ -271,17 +271,14 @@ def main(args=None):
 
         # ResNet models
         if model_class.startswith("ResNet"):
-            if not hasattr(parsed_args, 'layers'):
-                parsed_args.layers = None
-            # if not hasattr(parsed_args, 'padding_layer_sizes'):
-            #     parsed_args.padding_layer_sizes = None
-            # if not hasattr(parsed_args, 'num_classes'):
-            #     parsed_args.num_classes = 2
-            # if not hasattr(parsed_args, 'image_channels'):
-            #     parsed_args.image_channels = 1
-            
 
-            layers = parsed_args.layers if parsed_args.layers else [1, 1, 1, 1]
+            if not hasattr(parsed_args, 'layers'):
+                layers = None
+            else:
+                layers = parsed_args.layers
+            
+            # layers = parsed_args.layers if parsed_args.layers else [1, 1, 1, 1]
+
             model = get_nn_model(model_class, {
                 "num_classes": parsed_args.num_classes,
                 "image_channels": parsed_args.image_channels,
@@ -305,18 +302,8 @@ def main(args=None):
             data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
             data_module.setup()
 
-        elif parsed_args.data_module == "CustomDataModule": # TODO: Allow this to be passed in separate file?
-            data_module_setup = '0'
-            # if hasattr(parsed_args, 'data_module_setup'):
-            #     '''
-            #     Read in the data module setup from a file, json
-            #     '''
-            #     if data_module_setup.endswith('.json') and data_module_setup is not None:
-            #         data_module_setup = parsed_args.data_module_setup
-            #         with open(data_module_setup, 'r') as f:
-            #             data_module = json.load(f)
-            if data_module_setup == '0':
-                data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
+        elif parsed_args.data_module == "CustomDataModule":
+            data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
             print("Preparing data")
             data_module.prepare_data()
             print("Setting up data")
@@ -359,26 +346,13 @@ def main(args=None):
 
         elif parsed_args.data_module == "CustomDataModule": # TODO: Allow this to be passed in separate file?
             
-            data_module_setup = '0'
-
-            # if hasattr(parsed_args, 'data_module_setup'):
-            #     '''
-            #     Read in the data module setup from a file, json
-            #     '''
-            #     if data_module_setup.endswith('.json') and data_module_setup is not None:
-            #         data_module_setup = parsed_args.data_module_setup
-            #         with open(data_module_setup, 'r') as f:
-            #             data_module = json.load(f)
-            if data_module_setup == '0':
-                data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
+            data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
             print("Preparing data")
             data_module.prepare_data()
 
             print("Setting up data")
             data_module.setup()
-
         
-
         # Trainer for prediction
         trainer = L.Trainer()
 
