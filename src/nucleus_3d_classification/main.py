@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch
 import json
+from lightning.pytorch.callbacks import Callback
 
 # Tensorboard
 import tensorboard
@@ -174,6 +175,63 @@ def predict(model, X, save_name: str = None, save_dir: str = "./predictions", sa
                     pickle.dump(y, f)
         return model.predict(X)
 
+## Experimenting with Pytorch Lightning ####################################################################################################
+
+    # TODO: Implement the following functions
+
+def define_callbacks(callbacks: List[pl.Callback]):
+    callbacks = []
+    for callback in callbacks:
+        if callback == "early_stopping":
+            callbacks.append(pl.callbacks.EarlyStopping(monitor='val_loss'))
+        if callback == "model_checkpoint":
+            callbacks.append(pl.callbacks.ModelCheckpoint(monitor='val_loss'))
+        if callback == "lr_monitor":
+            callbacks.append(pl.callbacks.LearningRateMonitor())
+    return callbacks
+
+def define_trainer(
+        trainer_class, profiler: bool = False, 
+        max_epochs: int = 10, 
+        default_root_dir: str = "./logs",
+        callbacks: List[pl.Callback] = None,
+        logger: pl.loggers.LightningLoggerBase = None,
+        devices: str = "auto",
+        accelerator: str = "auto",
+        enable_checkpointing: bool = True,
+        enable_early_stopping: bool = True,
+        accumulate_grad_batches: int = 1,
+        fast_dev_run: bool = False,
+        limit_train_batches: int = 1.0,
+        limit_val_batches: int = 1.0,
+        limit_test_batches: int = 1.0,
+        limit_predict_batches: int = 1.0,
+        log_every_n_steps: int = 5
+        ):
+    # Define the trainer based on the arguments
+    trainer = trainer_class(
+        profiler=profiler,
+        max_epochs=max_epochs,
+        default_root_dir=default_root_dir,
+        callbacks=callbacks,
+        logger=logger,
+        devices=devices,
+        accelerator=accelerator,
+        enable_checkpointing=enable_checkpointing,
+        enable_early_stopping=enable_early_stopping,
+        accumulate_grad_batches=accumulate_grad_batches,
+        fast_dev_run=fast_dev_run,
+        limit_train_batches=limit_train_batches,
+        limit_val_batches=limit_val_batches,
+        limit_test_batches=limit_test_batches,
+        limit_predict_batches=limit_predict_batches,
+        log_every_n_steps=log_every_n_steps
+    )
+    return trainer
+
+######################################################################################################################
+
+
 def main(args=None):
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
 
@@ -223,7 +281,7 @@ def main(args=None):
     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-    nn_predict_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for prediction")
+    nn_predict_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for prediction") # TODO: Doesnt work when you use a setup file!
     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
 
     # Subparser for logistic regression and random forest

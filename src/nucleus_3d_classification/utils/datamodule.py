@@ -112,9 +112,10 @@ def load_labels(label_dir):
 
 # LightningDataModule to handle dataset and dataloading logic
 class CustomDataModule(L.LightningDataModule):
-    def __init__(self, setup_file=None, root_dir=None, crop_dir=None, label_dir=None, label_to_directory=None, target_size=[34,164,174], batch_size: int = 16, num_workers=0,
-                 train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'], test_image_names='c0_0-55'): 
-                    # TODO: # Change the default to None later ?
+    def __init__(self, setup_file=None, root_dir=None, crop_dir=None, label_dir=None, 
+                label_to_directory=None, target_size=[34,164,174], batch_size: int = 16,
+                num_workers=0, train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'],
+                test_image_names='c0_0-55'): # TODO: # Change the default to None later ?
         super().__init__()
         self.root_dir = root_dir # root dir is useless here rn TODO: Remove?
         self.crop_dir = crop_dir
