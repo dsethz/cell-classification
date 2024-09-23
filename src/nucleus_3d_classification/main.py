@@ -48,11 +48,11 @@ please comment on https://github.com/pytorch/pytorch/issues/77764. As a temporar
 variable `PYTORCH_ENABLE_MPS_FALLBACK=1` to use the CPU as a fallback for this op. WARNING: this will be slower than 
 running natively on MPS.
 
-Before running - terminal command:
+Before running use terminal command:
 export PYTORCH_ENABLE_MPS_FALLBACK=1
-'''
 
-os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+Otherwise maxpool will not work on MPS device
+'''
 
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
@@ -254,7 +254,7 @@ def main(args=None):
         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
         predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='csv', help="Save predictions as CSV or pickle")
-        predict_parser.add_argument("--remove_label", type=bool, default=True, help="Remove 'label' column from prediction data")
+        predict_parser.add_argument("--remove_label", type=bool, default=True, help="Remove 'label' column from prediction data, if it exists")
 
     # Parse arguments
     if args is None:
@@ -316,18 +316,7 @@ def main(args=None):
             #         with open(data_module_setup, 'r') as f:
             #             data_module = json.load(f)
             if data_module_setup == '0':
-                data_module = CustomDataModule(
-                    ###
-                    root_dir='/Users/agreic/Desktop/Project/Data/Raw',
-                    crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
-                    label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
-                    target_size=(34, 164, 174),
-                    batch_size=parsed_args.batch_size,
-                    train_image_names='Hoxb5',  # Default value
-                    val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
-                    test_image_names='c0_0-55'  # Default value
-                    ###
-                    )
+                data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
             print("Preparing data")
             data_module.prepare_data()
             print("Setting up data")
@@ -361,7 +350,7 @@ def main(args=None):
         # Load model
         model = get_nn_model_class(model_class).load_from_checkpoint(os.path.join(nn_predict_args.model_dir, f"{nn_predict_args.model_file}.ckpt"))
         
-            # // Currently, we cannot return class with a different than default block, because we cannot pass the block to the model
+            # // TODO: Currently, we cannot return class with a different than default block, because we cannot pass the block to the model
 
         # Load data module for prediction
         if parsed_args.data_module == "BaseDataModule":
@@ -381,18 +370,7 @@ def main(args=None):
             #         with open(data_module_setup, 'r') as f:
             #             data_module = json.load(f)
             if data_module_setup == '0':
-                data_module = CustomDataModule(
-                    ###
-                    root_dir='/Users/agreic/Desktop/Project/Data/Raw',
-                    crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
-                    label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
-                    target_size=(34, 164, 174),
-                    batch_size=parsed_args.batch_size,
-                    train_image_names='Hoxb5',  # Default value
-                    val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
-                    test_image_names='c0_0-55'  # Default value
-                    ###
-                    )
+                data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
             print("Preparing data")
             data_module.prepare_data()
 
@@ -440,18 +418,7 @@ if __name__ == "__main__":
     # #print(output.shape)
     # #print(output)
 
-    # data_module = CustomDataModule(
-    #                 ###
-    #                 root_dir='/Users/agreic/Desktop/Project/Data/Raw',
-    #                 crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
-    #                 label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
-    #                 target_size=(34, 164, 174),
-    #                 batch_size=2,
-    #                 train_image_names='Hoxb5',  # Default value
-    #                 val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
-    #                 test_image_names='c0_0-55'  # Default value
-    #                 ###
-    #                  )
+    # data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
     # data_module.prepare_data()
     # data_module.setup()
 
@@ -467,10 +434,5 @@ if __name__ == "__main__":
 
     # from utils.show_slice import show_slice
     # show_slice(images[0, 0, :, :, :])
-
-
-
-    #main()
-
-#if __name__ == "__main__":
+    
     main()

@@ -11,21 +11,178 @@ import pytorch_lightning as pl
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from utils.padding import pad
+#from utils.padding import pad # Uncomment this line when padding is implemented
 import lightning as L
+
+### TODO: REMOVE LATER: Padding function to pad images to target size ########################################################
+class pad:
+    def __init__(self, target_size):
+        self.target_size = target_size
+    
+    def __call__(self, img):
+        depth, height, width = img.shape
+        target_depth, target_height, target_width = self.target_size
+        
+        # Padding if necessary
+        pad_depth = (target_depth - depth) if depth < target_depth else 0
+        pad_height = (target_height - height) if height < target_height else 0
+        pad_width = (target_width - width) if width < target_width else 0
+        
+        # Padding in depth, height, width directions
+        padding = (
+            pad_width // 2, pad_width - pad_width // 2, 
+            pad_height // 2, pad_height - pad_height // 2, 
+            pad_depth // 2, pad_depth - pad_depth // 2
+        )
+
+        # TODO: Resize if necessary, not implemented yet
+        # img = F.resize(img, self.target)
+
+        img = F.pad(img, padding)
+        return img
+####################################################################################################################
+
+def match_labels_to_images(labels_dict, crop_dir, label_to_directory_file): # TODO: Remove label_dir later, as it is not used
+    """
+    Matches label files to image directories more robustly by checking image existence
+    and ensuring both directories have matching files.
+    
+    Args:
+        labels_dict (dict): Dictionary with label files and their metadata.
+        crop_dir (str): Directory containing cropped images.
+        label_to_directory_file (dict): A dictionary mapping label files to image directories: 
+            Keys are label files and values are image directories.
+            The file is expected to be in the crop_dir.
+
+    Returns:
+        label_to_directory (dict): A mapping of label files to image directories.
+    """
+    label_to_directory = {}
+
+    # Get list of image directories
+    image_directories = sorted([d for d in os.listdir(crop_dir) if os.path.isdir(os.path.join(crop_dir, d))])
+    print(f"Found {len(image_directories)} image directories.")
+
+    # Iterate over the label files
+    print(f"{len(labels_dict)} label files found: {list(labels_dict.keys())}")
+
+    # Open the label_to_directory_file, in the crop_dir
+    with open(os.path.join(crop_dir, label_to_directory_file)) as f:
+        label_to_directory_file = json.load(f)
+        print(f"Loaded label_to_directory_file: {label_to_directory_file}")
+        
+
+    for label_file, label_content in labels_dict.items():
+        label_name = label_file.split('.')[0]  # Remove file extension
+        matched_directory = None
+
+        # Matching based off of label_to_directory_file
+        if label_file in label_to_directory_file.keys():
+            matched_directory = label_to_directory_file[label_file]
+            print(f"Matched label file {label_file} with directory {matched_directory}.")
+            label_to_directory[label_file] = matched_directory
+            continue
+        
+        # # Try matching based on folder naming convention
+        # for directory in image_directories:
+        #     # Check if label name is in directory name
+        #     if label_name in directory:
+        #         matched_directory = directory
+        #         break
+
+        # Validate image existence and log missing images
+        if matched_directory:
+            image_path = os.path.join(crop_dir, matched_directory)
+            if not os.path.exists(image_path):
+                print(f"Warning: Image directory {image_path} does not exist.")
+            else:
+                print(f"Matched label file {label_file} with directory {matched_directory}.")
+                label_to_directory[label_file] = matched_directory
+        else:
+            print(f"Warning: No matching directory found for label file {label_file}.")
+
+    return label_to_directory
+
+def load_metadata_file(crop_dir, metadata_file='metadata.json'):
+    """
+    Load metadata file with error handling.
+    
+    Args:
+        crop_dir (str): Directory containing the metadata file.
+        metadata_file (str): Name of the metadata file.
+            The default is 'metadata.json'.
+            The metadata file is expected to be in the crop_dir.
+        
+    Returns:
+        dict: Parsed metadata information.
+    """
+    metadata_path = os.path.join(crop_dir, metadata_file)
+    
+    try:
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        print(f"Successfully loaded metadata from {metadata_path}")
+        return metadata
+    
+    except FileNotFoundError:
+        print(f"Error: Metadata file {metadata_path} not found.")
+    except json.JSONDecodeError as e:
+        print(f"Error: Failed to parse {metadata_path}. Invalid JSON format. {e}")
+    except Exception as e:
+        print(f"Error: An unexpected error occurred while reading {metadata_path}. {e}")
+    
+    raise RuntimeError("Failed to load metadata file")  # Raise an error if metadata file failed to load
+
+
+def load_labels(label_dir):
+    """
+    Load all label files in a directory with error handling.
+    
+    Args:
+        label_dir (str): Directory containing the label files.
+        
+    Returns:
+        dict: A dictionary containing label data loaded from JSON files.
+    """
+    labels_dict = {}
+
+    try:
+        for file in os.listdir(label_dir):
+            if file.endswith('.json'):
+                label_path = os.path.join(label_dir, file)
+                try:
+                    with open(label_path, 'r') as f:
+                        labels_dict[file] = json.load(f)
+                except FileNotFoundError:
+                    print(f"Error: Label file {label_path} not found.")
+                except json.JSONDecodeError as e:
+                    print(f"Error: Failed to parse {label_path}. Invalid JSON format. {e}")
+                except Exception as e:
+                    print(f"Error: An unexpected error occurred while reading {label_path}. {e}")
+                    
+    except FileNotFoundError:
+        print(f"Error: Label directory {label_dir} not found.")
+    except PermissionError:
+        print(f"Error: Permission denied to access {label_dir}.")
+    except Exception as e:
+        print(f"Error: An unexpected error occurred while accessing {label_dir}. {e}")
+    
+    return labels_dict  # Return the labels dictionary even if some files failed to load
 
 # LightningDataModule to handle dataset and dataloading logic
 class CustomDataModule(L.LightningDataModule):
-    def __init__(self, root_dir, crop_dir, label_dir, target_size, batch_size: int = 16, num_workers=0,
+    def __init__(self, setup_file=None, root_dir=None, crop_dir=None, label_dir=None, label_to_directory=None, target_size=[34,164,174], batch_size: int = 16, num_workers=0,
                  train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'], test_image_names='c0_0-55'): 
                     # TODO: # Change the default to None later
         super().__init__()
-        self.root_dir = root_dir
+        self.root_dir = root_dir # root dir is useless here rn TODO: Remove?
         self.crop_dir = crop_dir
         self.label_dir = label_dir
         self.target_size = target_size
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.setup_file = setup_file
+        self.label_to_directory = label_to_directory
 
         self.train_image_names = train_image_names
         self.val_image_names = val_image_names
@@ -42,32 +199,47 @@ class CustomDataModule(L.LightningDataModule):
         self.val_data = None
         self.test_data = None
 
+    # TESTING:
     def prepare_data(self):
-        # Load label dictionaries
-        labels_dict = {}
-        for file in os.listdir(self.label_dir):
-            if file.endswith('.json'):
-                with open(os.path.join(self.label_dir, file)) as f:
-                    labels_dict[file] = json.load(f)
-        labels_dict = dict(sorted(labels_dict.items()))
+        """
+        Prepares the data by loading metadata and labels, handling errors, and matching labels to images.
+        """
+        # Error handling for setup file and directories
+        assert self.setup_file is not None or (self.root_dir is not None and self.crop_dir is not None and self.label_dir is not None and self.label_to_directory is not None), \
+            'Either setup_file or root_dir, crop_dir, label_dir, and label_to_directory must be provided'
 
-        # Match label files with image directories
-        label_to_directory = {}
-        directory_list = sorted([d for d in os.listdir(f'{self.crop_dir}') if 'cutout' in d])
-        for label_name in labels_dict.keys():
-            for directory in directory_list:
-                if str(label_name).split('.')[0] in directory: 
-                    # Check if label file name is in directory name
-                    # This is a hacky way to match the label file with the image directory
-                    # TODO: Change this to a more robust method, e.g. using metadata
-                    label_to_directory[label_name] = directory
-        
-        # Filter labels with necessary information
-        new_labels_dict = {}
-        for label_file, content in labels_dict.items():
-            temp_dict = {key: value['ctype'] for key, value in content.items()}
-            new_labels_dict[label_file] = temp_dict
+        # Load setup information from file
+        if self.setup_file:
+            print(f'Loading setup information from {self.setup_file}')
+            with open(self.setup_file) as f:
+                setup_info = json.load(f)
+                self.root_dir = setup_info['root_dir']
+                self.crop_dir = setup_info['crop_dir']
+                self.label_dir = setup_info['label_dir']
+                self.target_size = setup_info['target_size']
+                self.batch_size = setup_info['batch_size']
+                self.train_image_names = setup_info['train_image_names']
+                self.val_image_names = setup_info['val_image_names']
+                self.test_image_names = setup_info['test_image_names']
+                self.label_to_directory = setup_info['label_to_directory']
+                self.num_workers = setup_info['num_workers'] 
 
+        # Load label files with error handling
+        labels_dict = load_labels(self.label_dir)
+
+        # Load metadata file with error handling
+        metadata = load_metadata_file(self.crop_dir)
+
+        # Check if metadata is correctly loaded
+        if not metadata:
+            print(f"Error: Failed to load metadata from {self.crop_dir}")
+            return
+
+        # Match labels to directories using the robust matching method
+        label_to_directory = match_labels_to_images(labels_dict, self.crop_dir, label_to_directory_file=self.label_to_directory)
+
+        # Filter out labels with necessary information and load data
+        new_labels_dict = {label_file: {k: v['ctype'] for k, v in content.items()} for label_file, content in labels_dict.items()}
         self._load_data(new_labels_dict, label_to_directory)
 
     def _load_data(self, new_labels_dict, label_to_directory):
@@ -156,21 +328,24 @@ class CustomDataModule(L.LightningDataModule):
 
 def main():
     # Instantiate the DataModule
-    data_module = CustomDataModule(
-        root_dir='/Users/agreic/Desktop/Project/Data/Raw',
-        crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
-        label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
-        target_size=(34, 164, 174),
-        batch_size=2,  # TODO: Change batch size to appropriate value
-        train_image_names='Hoxb5',  # Default value
-        val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
-        test_image_names='c0_0-55'  # Default value
-    )
+    # data_module = CustomDataModule(
+    #     root_dir='/Users/agreic/Desktop/Project/Data/Raw',
+    #     crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
+    #     label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
+    #     target_size=(34, 164, 174),
+    #     batch_size=2, 
+    #     train_image_names='Hoxb5',  # Default value
+    #     val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
+    #     test_image_names='c0_0-55', # Default value
+    #     label_to_directory='label_to_directory.json'
+    # )
+
+    data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
 
 
     # Prepare data and loaders
     data_module.prepare_data()
-    data_module.setup(stage=None)
+    data_module.setup()
 
     # Get the train, validation, and test loaders
     train_loader = data_module.train_dataloader()
@@ -181,6 +356,7 @@ def main():
     images, labels = next(iter(train_loader))
 
     print(images.shape)
+    print(labels)
 
 if __name__ == '__main__':
     main()
