@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 import lightning as L
 import torch.nn.functional as F
+import torch.optim as optim
 
 class Block(nn.Module):
     '''
@@ -45,10 +46,11 @@ class Block(nn.Module):
         return x
 
 class ResNet(L.LightningModule):
-    def __init__(self, block, layers, num_classes, 
+    def __init__(self, layers, num_classes, block=Block,
                 image_channels=1, ceil_mode=False,
                 zero_init_resudual: bool = False, # TODO: Check if we can implement this
-                padding_layer_sizes=None):
+                padding_layer_sizes=None, learning_rate=1e-3,
+                loss_fn: str = 'cross_entropy'):
         super(ResNet, self).__init__()
         '''
         This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
@@ -64,6 +66,20 @@ class ResNet(L.LightningModule):
         self.initial_out_channels = 64
         self.in_channels = self.initial_out_channels
         self.padding_layer_sizes = padding_layer_sizes
+        self.learning_rate = learning_rate
+        self.ceil_mode = ceil_mode
+
+        # Save Hyperparameters
+        self.save_hyperparameters()
+
+        # Loss fn handling
+        match loss_fn:
+            case 'cross_entropy':
+                self.loss_fn = F.cross_entropy
+            case 'mse':
+                self.loss_fn = F.mse_loss
+            case _:
+                return ValueError(f"Loss function {loss_fn} not supported")
 
         # INITIAL LAYERS
 
@@ -153,6 +169,71 @@ class ResNet(L.LightningModule):
     
     def print_model(self):
         print(self)
+    
+    def training_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+        x, y = batch
+        y_hat = self.forward(x)
+        loss = loss_fn(y_hat, y)
+        self.log('training_loss', loss)
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+        x, y = batch
+        y_hat = self.forward(x)
+        val_loss = loss_fn(y_hat, y)
+
+        
+        # TODO: Fix this
+        # y_pred = y_hat.argmax(dim=1)
+
+
+        # # Calculate accuracy, precision, recall
+        # acc = (x.argmax(dim=1) == y).float().mean()
+        # precision = (x.argmax(dim=1) == y).float().mean()
+        # recall = (x.argmax(dim=1) == y).float().mean()
+        
+        # values = {"val_loss": val_loss, "val_accuracy": acc, "val_precision": precision, "val_recall": recall}
+
+        # # Log the validation loss
+        # self.log_dict(values, on_epoch=True,
+        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+
+        return val_loss
+    
+    def test_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+
+        x, y = batch
+        y_hat = self.forward(x)
+        Test_step_loss = loss_fn(y_hat, y)
+
+        # TODO: Fix this
+        # # Calculate accuracy, precision, recall
+        # test_acc = (x.argmax(dim=1) == y).float().mean()
+        # test_precision = (x.argmax(dim=1) == y).float().mean()
+        # test_recall = (x.argmax(dim=1) == y).float().mean()
+        
+        # values = {"test_loss": Test_step_loss, "test_accuracy": test_acc, "test_precision": test_precision, "test_recall": test_recall}
+
+        # # Log the validation loss
+        # self.log_dict(values,
+        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+
+        return Test_step_loss
+    
+    def predict_step(self, x):
+        # TODO: Check this out
+        x = self.forward(x)
+        return x
+    
+    def configure_optimizers(self):
+        return optim.Adam(self.parameters(), lr=self.learning_rate)
+        # Adam.self.parameters() is used to optimize the model, we can input these parameters: 
+        # lr, betas, eps, weight_decay, amsgrad, etc.
+
+    
 
 def ResNet_custom_layers(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, layers=[1,1,1,1]):
     '''

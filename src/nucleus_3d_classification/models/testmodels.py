@@ -28,7 +28,7 @@ class BaseNNModel(L.LightningModule):
         return x
     
 class BaseNNModel2(L.LightningModule):
-    def __init__(self, Block, layers = 3):
+    def __init__(self, Block=testBlock, layers = 3):
         super().__init__()
         self.fc = nn.Linear(10, 10)
         self.fc2 = nn.Linear(10, 2)
@@ -72,8 +72,13 @@ class BaseNNModel2(L.LightningModule):
         return test_loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        x = batch
-        return self(x)
+        x, y = batch # As this is a dummy model, we are using data which has labels, thus we need to extract them
+        y_hat = self(x)
+        # Format the output to be a single prediction value for each sample
+        y_hat = torch.argmax(y_hat, dim=1)
+        print(f"Predictions: {y_hat}, True labels: {y}")
+        return y_hat
+        
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=0.02)

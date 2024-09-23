@@ -22,6 +22,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch
+import json
+
+# Tensorboard
+import tensorboard
 
 from utils.testdatamodule import BaseDataModule
 from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
@@ -34,7 +38,21 @@ from datetime import datetime
 import pytorch_lightning as pl
 import torch
 
+from utils.datamodule import CustomDataModule
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet, Block, ResNet_custom_layers
+
+'''
+NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented 
+for the MPS device. If you want this op to be added in priority during the prototype phase of this feature, 
+please comment on https://github.com/pytorch/pytorch/issues/77764. As a temporary fix, you can set the environment 
+variable `PYTORCH_ENABLE_MPS_FALLBACK=1` to use the CPU as a fallback for this op. WARNING: this will be slower than 
+running natively on MPS.
+
+Before running - terminal command:
+export PYTORCH_ENABLE_MPS_FALLBACK=1
+'''
+
+os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
@@ -75,6 +93,29 @@ def get_nn_model(model_name: str, extra_args: dict = None):
         model = get_BaseNNModel2(extra_args['Block'], extra_args['layers'])
 
         return model
+    elif model_name == "ResNet50":
+        return ResNet50(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
+    elif model_name == "ResNet101":
+        return ResNet101(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
+    elif model_name == "ResNet152":
+        return ResNet152(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
+    elif model_name == "ResNet_custom_layers":
+        return ResNet_custom_layers(layers=extra_args['layers'], ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
+    
+
+def get_nn_model_class(model_name: str):
+    if model_name == "ResNet50":
+        return ResNet50
+    elif model_name == "ResNet101":
+        return ResNet101
+    elif model_name == "ResNet152":
+        return ResNet152
+    elif model_name == "ResNet_custom_layers":
+        return ResNet_custom_layers
+    elif model_name == "BaseNNModel":
+        return BaseNNModel
+    elif model_name == "BaseNNModel2":
+        return BaseNNModel2
 
 def load_data(data_dir:str, data_file: str, target: str):
     # Implement data loading for RF and LogReg
@@ -133,199 +174,303 @@ def predict(model, X, save_name: str = None, save_dir: str = "./predictions", sa
                     pickle.dump(y, f)
         return model.predict(X)
 
-def main(args: List[str] = None):
+def main(args=None):
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
-    
-    # Universal arguments
-    parser.add_argument("command", type=str, choices=['train', 'predict'], help="Command to execute")
-    parser.add_argument("--model_type", type=str, default='logreg', help="Model to use (rf, logreg, or nn), default is nn")
 
-    # Parse initial arguments
+    # Model type argument (nn, logreg, rf)
+    subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
+
+    # Subparser for neural networks
+    nn_parser = subparsers.add_parser('nn', help="Neural network model options")
+
+    # Subparsers for 'train' and 'predict' under 'nn'
+    nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
+
+    # Neural network-specific training options
+    nn_train_parser = nn_subparsers.add_parser("train", help="Train a neural network model")
+    nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    nn_train_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+    # nn_train_parser.add_argument("--data_module_setup", type=str, help="Data module setup file (json) (full path)") # TODO: Implement this   
+    nn_train_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+    nn_train_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+    
+    nn_train_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=[
+        'ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'
+    ], help="Model class to use")
+
+    # Additional ResNet-specific arguments
+    nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+    nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 20, 19), help="Padding layers for ResNet")
+
+    # Check what argument model_class is and add the appropriate arguments
+    # To check, we first have to parse the arguments
+    nn_train_args, _ = nn_train_parser.parse_known_args()
+    if nn_train_args.model_class in ["ResNet_custom_layers"]:
+        nn_train_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers)")
+    elif nn_train_args.model_class == "BaseNNModel2":
+        nn_train_parser.add_argument("--layers", type=int, default=3, help="Number of layers (for BaseNNModel2)")
+        nn_train_parser.add_argument("--block", type=str, default='testBlock', help="Block type (for BaseNNModel2)")
+
+    # Neural network-specific prediction options
+    nn_predict_parser = nn_subparsers.add_parser("predict", help="Predict using a neural network model")
+    nn_predict_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=[
+        'ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'
+    ], help="Model class to use")
+    nn_predict_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+    #nn_predict_parser.add_argument("--data_module_setup", type=str, help="Data module setup file (json) (full path)") # TODO: Implement this   
+    nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
+    nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+    nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+    nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+    nn_predict_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for prediction")
+    nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+
+    # Subparser for logistic regression and random forest
+    for model_type in ['logreg', 'rf']:
+        model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
+
+        # Subparsers for 'train' and 'predict' under 'logreg' or 'rf'
+        model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
+
+        # Training options for scikit-learn models
+        train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
+        train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+        train_parser.add_argument("--data", type=str, required=True, help="Data file")
+        train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+        train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+        train_parser.add_argument("--class_weight", type=str, choices=["balanced", None], default="balanced", help="Class weight for classification")
+        if model_type == "logreg":
+            train_parser.add_argument("--save_name", type=str, default='logreg_model', help="Filename for saved model")
+            train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
+        elif model_type == "rf":
+            train_parser.add_argument("--save_name", type=str, default='rf_model', help="Filename for saved model")
+
+        # Prediction options for scikit-learn models
+        predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
+        predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+        predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+        predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+        predict_parser.add_argument("--data", type=str, required=True, help="Data file")
+        predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+        predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='csv', help="Save predictions as CSV or pickle")
+        predict_parser.add_argument("--remove_label", type=bool, default=True, help="Remove 'label' column from prediction data")
+
+    # Parse arguments
     if args is None:
         args = sys.argv[1:]
+    parsed_args = parser.parse_args(args)
 
-    parsed_args, remaining_args = parser.parse_known_args(args)
+    # If Namespace object has no attribute 'max_iter', set it to 1
+    if not hasattr(parsed_args, 'max_iter'):
+        parsed_args.max_iter = 1
 
-    if parsed_args.model_type == 'nn':
-        ResNet_implemented = ['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers']
-        testmodels_implemented = ['BaseNNModel', 'BaseNNModel2']
+    # Neural network training logic
+    if parsed_args.model_type == "nn" and parsed_args.command == "train":
+        model_class = parsed_args.model_class
 
-        all_implemented = ResNet_implemented + testmodels_implemented
-
-        parser.add_argument("--batch_size", type=int, default=32, help="Batch size to use")
-        parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-        parser.add_argument("--profiler", type=bool, default=False, help="Enable the PyTorch Lightning profiler")
-        parser.add_argument("--model_class", type=str, choices=all_implemented, default='BaseNNModel2', help="Name of the model to use")
-
-        if parsed_args.command == 'train':
-        # Additional arguments for Lightning models
-            parser.add_argument("--max_epochs", type=int, default=10, help="Maximum number of epochs to train for")
-
-            parsed_args = parser.parse_args(args)  # Reparse with additional options
+        # ResNet models
+        if model_class.startswith("ResNet"):
+            if not hasattr(parsed_args, 'layers'):
+                parsed_args.layers = None
+            # if not hasattr(parsed_args, 'padding_layer_sizes'):
+            #     parsed_args.padding_layer_sizes = None
+            # if not hasattr(parsed_args, 'num_classes'):
+            #     parsed_args.num_classes = 2
+            # if not hasattr(parsed_args, 'image_channels'):
+            #     parsed_args.image_channels = 1
             
-            # If model_class is a ResNet model, we need to parse additional arguments
-            if parsed_args.model_class in ResNet_implemented:
-                parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
-                parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
-                parser.add_argument("--padding_layer_sizes", type=tuple, default=(2,2,4,3,20,19), help="Padding layer sizes for the ResNet model")
-                if parsed_args.model_class == 'ResNet_custom_layers':
-                    parser.add_argument("--layers", type=int, default=[1,1,1,1], help="Number of layers to use")
-                extra_args = parser.parse_args(args)
 
-                padding_layer_sizes = extra_args.padding_layer_sizes
-                if len(padding_layer_sizes) != 6:
-                    raise ValueError("Padding layer sizes must be a tuple of 6 integers")
-                
-                num_classes = extra_args.num_classes
-                image_channels = extra_args.image_channels
-                layers = extra_args.layers
+            layers = parsed_args.layers if parsed_args.layers else [1, 1, 1, 1]
+            model = get_nn_model(model_class, {
+                "num_classes": parsed_args.num_classes,
+                "image_channels": parsed_args.image_channels,
+                "padding_layer_sizes": parsed_args.padding_layer_sizes,
+                "layers": layers
+            })
+        elif model_class in ["BaseNNModel", "BaseNNModel2"]:
+            # BaseNNModel and BaseNNModel2
 
-                extra_args = {
-                "Block": Block if Block is not None else testBlock,
-                "layers": layers if layers is not None else [1,1,1,1],
-                "num_classes": num_classes if num_classes is not None else 2,
-                "image_channels": image_channels if image_channels is not None else 1,
-                "padding_layer_sizes": padding_layer_sizes if padding_layer_sizes is not None else (2,2,4,3,20,19)
-                }
+            if model_class == "BaseNNModel2":
+                block = parsed_args.block or 'testBlock' # Default to testBlock for BaseNNModel2
+                if block == "testBlock":
+                    block = testBlock
+                layers = parsed_args.layers or 3 # Default to 3 layers for BaseNNModel2
+                model = get_nn_model(model_class, {'layers': layers, 'Block': block})
+            elif model_class == "BaseNNModel":
+                model = get_nn_model(model_class)
 
-                model = get_nn_model(parsed_args.model_class, extra_args = extra_args)
+        # Data module setup for neural network
+        if parsed_args.data_module == "BaseDataModule":
+            data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
+            data_module.setup()
+
+        elif parsed_args.data_module == "CustomDataModule": # TODO: Allow this to be passed in separate file?
+            data_module_setup = '0'
+            # if hasattr(parsed_args, 'data_module_setup'):
+            #     '''
+            #     Read in the data module setup from a file, json
+            #     '''
+            #     if data_module_setup.endswith('.json') and data_module_setup is not None:
+            #         data_module_setup = parsed_args.data_module_setup
+            #         with open(data_module_setup, 'r') as f:
+            #             data_module = json.load(f)
+            if data_module_setup == '0':
+                data_module = CustomDataModule(
+                    ###
+                    root_dir='/Users/agreic/Desktop/Project/Data/Raw',
+                    crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
+                    label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
+                    target_size=(34, 164, 174),
+                    batch_size=parsed_args.batch_size,
+                    train_image_names='Hoxb5',  # Default value
+                    val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
+                    test_image_names='c0_0-55'  # Default value
+                    ###
+                    )
+            print("Preparing data")
+            data_module.prepare_data()
+            print("Setting up data")
+            data_module.setup()
+
+        # Train the neural network
+        if parsed_args.profiler:
+            profiler = L.profiler.SimpleProfiler()
+            trainer = L.Trainer(profiler=profiler, max_epochs=parsed_args.max_epochs)
+        else:
+            trainer = L.Trainer(max_epochs=parsed_args.max_epochs)
+
+        print("Training with the following configuration:", parsed_args)
+        trainer.fit(model, datamodule=data_module)
+
+    # Neural network prediction logic
+    elif parsed_args.model_type == "nn" and parsed_args.command == "predict":
+
+        # Check what argument model_class is and add the appropriate arguments
+        # To check, we first have to parse the arguments
+        nn_predict_args, _ = nn_predict_parser.parse_known_args()
+        if nn_predict_args.model_class == "ResNet_custom_layers":
+            nn_predict_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers)")
+        elif nn_predict_args.model_class == "BaseNNModel2":
+            nn_predict_parser.add_argument("--layers", type=int, default=3, help="Number of layers (for BaseNNModel2)")
+            nn_predict_parser.add_argument("--block", type=str, default='testBlock', help="Block type (for BaseNNModel2)")
+        
+        nn_predict_args, _ = nn_predict_parser.parse_known_args()
+        # Get model class
+        model_class = nn_predict_args.model_class
+        # Load model
+        model = get_nn_model_class(model_class).load_from_checkpoint(os.path.join(nn_predict_args.model_dir, f"{nn_predict_args.model_file}.ckpt"))
+        
+            # // Currently, we cannot return class with a different than default block, because we cannot pass the block to the model
+
+        # Load data module for prediction
+        if parsed_args.data_module == "BaseDataModule":
+            data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
+            data_module.setup()
+
+        elif parsed_args.data_module == "CustomDataModule": # TODO: Allow this to be passed in separate file?
             
-            if parsed_args.model_class == 'BaseNNModel':
-                model = get_nn_model(parsed_args.model_class)
-            
-            if parsed_args.model_class == 'BaseNNModel2':
-                parser.add_argument("--layers", type=int, default=3, help="Number of layers to use")
-                extra_args = parser.parse_args(args)  # Reparse with additional options
-                layers = extra_args.layers
+            data_module_setup = '0'
 
-                extra_args = {
-                "Block": testBlock if testBlock is not None else Block,
-                "layers": layers if layers is not None else 3,
-                }
-                model = get_nn_model(parsed_args.model_class, extra_args = extra_args)
-            
-            # Load the data module
-            if parsed_args.data_module == 'BaseDataModule':
-                data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
-                data_module.setup()
-            else:
-                # Implement custom data module loading
-                pass
+            # if hasattr(parsed_args, 'data_module_setup'):
+            #     '''
+            #     Read in the data module setup from a file, json
+            #     '''
+            #     if data_module_setup.endswith('.json') and data_module_setup is not None:
+            #         data_module_setup = parsed_args.data_module_setup
+            #         with open(data_module_setup, 'r') as f:
+            #             data_module = json.load(f)
+            if data_module_setup == '0':
+                data_module = CustomDataModule(
+                    ###
+                    root_dir='/Users/agreic/Desktop/Project/Data/Raw',
+                    crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
+                    label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
+                    target_size=(34, 164, 174),
+                    batch_size=parsed_args.batch_size,
+                    train_image_names='Hoxb5',  # Default value
+                    val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
+                    test_image_names='c0_0-55'  # Default value
+                    ###
+                    )
+            print("Preparing data")
+            data_module.prepare_data()
 
-            # Simple profiler
-            if parsed_args.profiler:
-                profiler = L.profiler.SimpleProfiler()
-                trainer = L.Trainer(profiler=profiler, max_epochs=parsed_args.max_epochs)
-            else:
-                profiler = None
-                trainer = L.Trainer(max_epochs=parsed_args.max_epochs)
+            print("Setting up data")
+            data_module.setup()
 
-            print("Parsed arguments for train:", parsed_args)
+        
 
-            assert model is not None, "Model is None"
-            
-            trainer.fit(model, datamodule=data_module)
+        # Trainer for prediction
+        trainer = L.Trainer()
 
-        elif parsed_args.command == 'predict':
-            parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-            parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save the predictions in")
-            parser.add_argument("--save_name", type=str, default='Prediction', help="Name to save the predictions as")
+        # Predict using neural network
+        predictions = trainer.predict(model, datamodule=data_module)
+        create_dir_if_not_exists(parsed_args.save_dir)
 
-            parsed_args = parser.parse_args(args)  # Reparse with additional options
-
-            # Load the respective model and checkpoint # TODO: Fix this
-            # model = BaseModel.load_from_checkpoint(os.path.join(parsed_args.model_dir, f"{parsed_args.model_file}.ckpt"))
-
-            # Load the data module
-            if parsed_args.data_module == 'BaseDataModule':
-                data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
-                data_module.setup()
-            else:
-                # Implement custom data module loading
-                pass
-
-            # Simple profiler
-            if parsed_args.profiler:
-                profiler = L.profiler.SimpleProfiler()
-                trainer = L.Trainer(profiler=profiler)
-            else:
-                profiler = None
-                trainer = L.Trainer()
-
-            predictions = trainer.predict(model, datamodule=data_module)
-
-            # Save predictions to csv
-            create_dir_if_not_exists(parsed_args.save_dir)
+        # Save predictions with the specified save type
+        if parsed_args.save_type == 'csv':
             pd.DataFrame(predictions).to_csv(os.path.join(parsed_args.save_dir, f"{parsed_args.save_name}.csv"), index=False)
-            
-            print(predictions)
+        elif parsed_args.save_type == 'pkl':
+            with open(os.path.join(parsed_args.save_dir, f"{parsed_args.save_name}.pkl"), 'wb') as f:
+                pickle.dump(predictions, f)
 
-    if parsed_args.model_type in ['rf', 'logreg']:
-        # Additional arguments for scikit-learn models
-        parser.add_argument("--data_dir", type=str, default="./data", help="Data directory to use")
-        parser.add_argument("--data", type=str, required=True, help="Data file to use")
+    # Scikit-learn training logic (Random Forest / Logistic Regression)
+    elif parsed_args.model_type in ["rf", "logreg"] and parsed_args.command == "train":
+        model = get_model(parsed_args.model_type, class_weight=parsed_args.class_weight, max_iter=parsed_args.max_iter)
+        X, y = load_data(parsed_args.data_dir, parsed_args.data, parsed_args.target)
+        train(model, X, y, save_name=parsed_args.save_name, save_dir=parsed_args.save_dir)
 
-        if parsed_args.command == 'train':
-            parser.add_argument("--save_dir", type=str, default="./models", help="Directory to save the model in")
-            parser.add_argument("--target", type=str, default='label', help="Target column to predict")
-            parser.add_argument("--class_weight", type=str, choices=('balanced', None), default='balanced', help="Class weight to use")
+    # Scikit-learn prediction logic (Random Forest / Logistic Regression)
+    elif parsed_args.model_type in ["rf", "logreg"] and parsed_args.command == "predict":
+        model_file = os.path.join(parsed_args.model_dir, f"{parsed_args.model_file}.pkl")
+        with open(model_file, "rb") as f:
+            model = pickle.load(f)
 
-            if parsed_args.model_type == 'logreg':
-                parser.add_argument("--save_name", type=str, default='Logistic_regression_model', help="Name to save the model as")
-                parser.add_argument("--max_iter", type=int, default=1000, help="Maximum number of iterations for Logistic Regression")
-
-            if parsed_args.model_type == 'rf':
-                parser.add_argument("--save_name", type=str, default='Random_forest_model', help="Name to save the model as")
-
-            parsed_args = parser.parse_args(args)  # Reparse with additional options
-            
-            # Handling missing max_iter for RF
-            if parsed_args.model_type == 'rf':
-                parsed_args.max_iter = 1000
-
-            print("Parsed arguments for train:", parsed_args)
-
-            model = get_model(parsed_args.model_type, class_weight=parsed_args.class_weight, max_iter=parsed_args.max_iter)
-            X, y = load_data(parsed_args.data_dir, parsed_args.data, parsed_args.target)
-            train(model, X, y, save_name=parsed_args.save_name, save_dir=parsed_args.save_dir)
-
-        if parsed_args.command == 'predict':
-            parser.add_argument("--save_name", type=str, default='Prediction', help="Name to save the predictions as")
-            parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-            parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='csv', help="Type to save the predictions as")
-            parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save the predictions in")
-            parser.add_argument("--remove_label", type=bool, default=True, help="Remove 'label' column from prediction data")
-
-            parsed_args = parser.parse_args(args)  # Reparse with additional options
-            
-            print("Parsed arguments for predict:", parsed_args)
-            
-            # Load the model from the file
-            with open(os.path.join(parsed_args.model_dir, f"{parsed_args.model_file}.pkl"), 'rb') as f:
-                model = pickle.load(f)
-            # Load the prediction data
-            X = load_predict_data(parsed_args.data_dir, parsed_args.data, remove_label=parsed_args.remove_label)
-            predictions = predict(model, X, save_name=parsed_args.save_name, save_type=parsed_args.save_type)
-            print(predictions)
-
-# if __name__ == "__main__":
-    # model2 = BaseNNModel2(Block=Block)
-    # print(model2)
-
-    # x = torch.randn(10)
-    # print(model2(x).shape)
-
-    # model = ResNet(block=Block, layers=[1,1,1,1], num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
-    # #print(model)
-
-    # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
-    # output = model(tensor)
-    # print(output.shape)
-    #print(output)
-
-    # main()
+        X = load_predict_data(parsed_args.data_dir, parsed_args.data, remove_label=parsed_args.remove_label)
+        predictions = predict(model, X, save_name=parsed_args.save_name, save_type=parsed_args.save_type)
+        print(predictions)
 
 if __name__ == "__main__":
+    # model = ResNet50(num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
+    # #print(model)
+
+    # # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    # #output = model(tensor)
+    # #print(output.shape)
+    # #print(output)
+
+    # data_module = CustomDataModule(
+    #                 ###
+    #                 root_dir='/Users/agreic/Desktop/Project/Data/Raw',
+    #                 crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
+    #                 label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
+    #                 target_size=(34, 164, 174),
+    #                 batch_size=2,
+    #                 train_image_names='Hoxb5',  # Default value
+    #                 val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
+    #                 test_image_names='c0_0-55'  # Default value
+    #                 ###
+    #                  )
+    # data_module.prepare_data()
+    # data_module.setup()
+
+    # train_loader = data_module.train_dataloader()
+
+    # dataiter = iter(train_loader)
+    # images, labels = next(dataiter)
+    # print(images.shape)
+
+    # y = model(images)
+    # print(y.shape)
+    # print(y)
+
+    # from utils.show_slice import show_slice
+    # show_slice(images[0, 0, :, :, :])
+
+
+
+    #main()
+
+#if __name__ == "__main__":
     main()

@@ -11,10 +11,11 @@ import pytorch_lightning as pl
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import numpy as np
-from padding import pad
+from utils.padding import pad
+import lightning as L
 
 # LightningDataModule to handle dataset and dataloading logic
-class CustomDataModule(pl.LightningDataModule):
+class CustomDataModule(L.LightningDataModule):
     def __init__(self, root_dir, crop_dir, label_dir, target_size, batch_size: int = 16, num_workers=0,
                  train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'], test_image_names='c0_0-55'): 
                     # TODO: # Change the default to None later
@@ -153,29 +154,33 @@ class CustomDataModule(pl.LightningDataModule):
     def test_dataset(self):
         return self.test_data
 
-# Instantiate the DataModule
-data_module = CustomDataModule(
-    root_dir='/Users/agreic/Desktop/Project/Data/Raw',
-    crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
-    label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
-    target_size=(34, 164, 174),
-    batch_size=2,  # TODO: Change batch size to appropriate value
-    train_image_names='Hoxb5',  # Default value
-    val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
-    test_image_names='c0_0-55'  # Default value
-)
+def main():
+    # Instantiate the DataModule
+    data_module = CustomDataModule(
+        root_dir='/Users/agreic/Desktop/Project/Data/Raw',
+        crop_dir='/Users/agreic/Desktop/Project/Data/Raw/Training/',
+        label_dir='/Users/agreic/Desktop/Project/Data/Raw/Segmentation/curated_masks/neg_subset_and_mega/curated_before_filter/mask_dicts',
+        target_size=(34, 164, 174),
+        batch_size=2,  # TODO: Change batch size to appropriate value
+        train_image_names='Hoxb5',  # Default value
+        val_image_names=['c0_0-68_1000', 'c0_0-68_950'],  # Default values
+        test_image_names='c0_0-55'  # Default value
+    )
 
 
-# Prepare data and loaders
-data_module.prepare_data()
-data_module.setup(stage=None)
+    # Prepare data and loaders
+    data_module.prepare_data()
+    data_module.setup(stage=None)
 
-# Get the train, validation, and test loaders
-train_loader = data_module.train_dataloader()
-val_loader = data_module.val_dataloader()
-test_loader = data_module.test_dataloader()
+    # Get the train, validation, and test loaders
+    train_loader = data_module.train_dataloader()
+    val_loader = data_module.val_dataloader()
+    test_loader = data_module.test_dataloader()
 
-# Sanity check, print the first batch of images and labels using the show_slice function
-images, labels = next(iter(train_loader))
+    # Sanity check, print the first batch of images and labels using the show_slice function
+    images, labels = next(iter(train_loader))
 
-print(images.shape)
+    print(images.shape)
+
+if __name__ == '__main__':
+    main()

@@ -85,3 +85,8 @@ venv/
 /src/nucleus_3d_classification/data
 src/nucleus_3d_classification/structuremain.py
 /src/lightning_logs
+src/nucleus_3d_classification/models/Logistic_regression_model.pkl
+src/nucleus_3d_classification/models/model.pkl
+/src/nucleus_3d_classification/models
+/src/nucleus_3d_classification/predictions
+/src/nucleus_3d_classification/lightning_logs
