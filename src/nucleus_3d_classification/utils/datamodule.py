@@ -284,7 +284,6 @@ def main():
 
     data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
 
-
     # Prepare data and loaders
     data_module.prepare_data()
     data_module.setup()

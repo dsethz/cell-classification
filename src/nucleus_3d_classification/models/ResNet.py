@@ -83,10 +83,10 @@ class ResNet(L.LightningModule):
 
         # INITIAL LAYERS
 
-        self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=7, stride=(1,2,2), padding=3, bias=False)
         self.bn1 = nn.BatchNorm3d(self.initial_out_channels)
         self.relu = nn.ReLU(inplace=True)
-        self.max_pool = nn.MaxPool3d(kernel_size=3, stride=2, padding=1, ceil_mode=ceil_mode) # TODO: Check if want ceil mode true
+        self.max_pool = nn.MaxPool3d(kernel_size=3, stride=(1,2,2), padding=1, ceil_mode=ceil_mode) # TODO: Check if want ceil mode true
 
         # RESIDUAL BLOCKS
 
@@ -134,9 +134,11 @@ class ResNet(L.LightningModule):
         print(f"After MaxPool: {x.shape}")
 
         # PADDING
-        if self.padding_layer_sizes is not None:
-            x = F.pad(x, self.padding_layer_sizes)  # TODO: Check if I want this, as this is not in the original code
-            print(f'After padding: {x.shape}')
+        # if self.padding_layer_sizes is not None:
+        #     x = F.pad(x, self.padding_layer_sizes)  # TODO: 
+        #     print(f'After padding: {x.shape}')
+
+        # x = pad_to_shape(x, (2, 64, 48, 48, 48))
 
         x = self.conv2_x(x)
         print(f"After Conv2_x: {x.shape}")
@@ -272,13 +274,17 @@ def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual
 
 # TODO : REMOVE BELOW, JUST FOR TESTING
 
-def main():
-    model = ResNet(block=Block, layers=[1,1,1,1], num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
-    #print(model)
+# from torchvision.transforms import pad_to_shape
 
-    tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
-    output = model(tensor)
-    print(output.shape)
+def main():
+    model = ResNet(block=Block, layers=[2,2,1,1], num_classes=2, image_channels=1, 
+                padding_layer_sizes=(2,2,4,3,20,19)) # TODO: Make this padding adaptive and change it to 48 48 48, but stride 1 for z before
+                # pad_to_shape=(2, 64, 48, 48, 48))
+    print(model)
+
+    # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    # output = model(tensor)
+    # print(output.shape)
     #print(output)
 
 # Before avg pool torch.Size([2, 1024, 5, 10, 11])

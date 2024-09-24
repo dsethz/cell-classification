@@ -23,6 +23,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, random_split
 import torch
 import json
+from pytorch_lightning.loggers import TensorBoardLogger
 from lightning.pytorch.callbacks import Callback
 
 # Tensorboard
@@ -78,7 +79,7 @@ def get_model(model_name: str, class_weight: Optional[str] = None, max_iter: int
 def get_nn_model(model_name: str, extra_args: dict = None):
 
     if extra_args is None:
-        extra_args = {}
+        extra_args = 'None'
 
     print(f"Creating model: {model_name} with extra_args: {extra_args}")
 
@@ -179,14 +180,14 @@ def predict(model, X, save_name: str = None, save_dir: str = "./predictions", sa
 
     # TODO: Implement the following functions
 
-def define_callbacks(callbacks: List[pl.Callback]):
+def define_callbacks(callback_names: List[str]) -> List[pl.Callback]:
     callbacks = []
-    for callback in callbacks:
-        if callback == "early_stopping":
+    for callback_name in callback_names:
+        if callback_name == "early_stopping":
             callbacks.append(pl.callbacks.EarlyStopping(monitor='val_loss'))
-        if callback == "model_checkpoint":
+        elif callback_name == "model_checkpoint":
             callbacks.append(pl.callbacks.ModelCheckpoint(monitor='val_loss'))
-        if callback == "lr_monitor":
+        elif callback_name == "lr_monitor":
             callbacks.append(pl.callbacks.LearningRateMonitor())
     return callbacks
 
@@ -194,8 +195,7 @@ def define_trainer(
         trainer_class, profiler: bool = False, 
         max_epochs: int = 10, 
         default_root_dir: str = "./logs",
-        callbacks: List[pl.Callback] = None,
-        logger: pl.loggers.LightningLoggerBase = None,
+        logger: pl.loggers.Logger = TensorBoardLogger,
         devices: str = "auto",
         accelerator: str = "auto",
         enable_checkpointing: bool = True,
@@ -206,14 +206,14 @@ def define_trainer(
         limit_val_batches: int = 1.0,
         limit_test_batches: int = 1.0,
         limit_predict_batches: int = 1.0,
-        log_every_n_steps: int = 5
+        log_every_n_steps: int = 5,
+        callbacks: List[pl.Callback] = None
         ):
     # Define the trainer based on the arguments
     trainer = trainer_class(
         profiler=profiler,
         max_epochs=max_epochs,
         default_root_dir=default_root_dir,
-        callbacks=callbacks,
         logger=logger,
         devices=devices,
         accelerator=accelerator,
@@ -225,7 +225,8 @@ def define_trainer(
         limit_val_batches=limit_val_batches,
         limit_test_batches=limit_test_batches,
         limit_predict_batches=limit_predict_batches,
-        log_every_n_steps=log_every_n_steps
+        log_every_n_steps=log_every_n_steps,
+        callbacks=callbacks
     )
     return trainer
 
@@ -240,8 +241,24 @@ def main(args=None):
 
     # Subparser for neural networks
     nn_parser = subparsers.add_parser('nn', help="Neural network model options")
+    
+        # Neural network-specific arguments - trainer options
+    nn_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+    nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+    nn_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
+    nn_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
+    nn_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
+    nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
+    nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+    nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+    nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+    nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
+    nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+    nn_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
+        # Neural network-specific arguments - callbacks
+    nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
 
-    # Subparsers for 'train' and 'predict' under 'nn'
+        # Subparsers for 'train' and 'predict' under 'nn'
     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
 
     # Neural network-specific training options
@@ -249,8 +266,8 @@ def main(args=None):
     nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
     nn_train_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
     # nn_train_parser.add_argument("--data_module_setup", type=str, help="Data module setup file (json) (full path)") # TODO: Implement this   
-    nn_train_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
-    nn_train_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+    #nn_train_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+    #nn_train_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
     
     nn_train_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=[
         'ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'
@@ -367,12 +384,39 @@ def main(args=None):
             print("Setting up data")
             data_module.setup()
 
-        # Train the neural network
-        if parsed_args.profiler:
-            profiler = L.profiler.SimpleProfiler()
-            trainer = L.Trainer(profiler=profiler, max_epochs=parsed_args.max_epochs)
-        else:
-            trainer = L.Trainer(max_epochs=parsed_args.max_epochs)
+        # Instantiate callbacks
+        callbacks_ = define_callbacks(parsed_args.callbacks)
+        # Instantiate trainer
+            # Trainer specific arguments
+        profiler = parsed_args.profiler
+        max_epochs = parsed_args.max_epochs
+        default_root_dir = parsed_args.default_root_dir
+        devices = parsed_args.devices
+        accelerator = parsed_args.accelerator
+        accumulate_grad_batches = parsed_args.accumulate_grad_batches
+        fast_dev_run = parsed_args.fast_dev_run
+        limit_train_batches = parsed_args.limit_train_batches
+        limit_val_batches = parsed_args.limit_val_batches
+        limit_test_batches = parsed_args.limit_test_batches
+        limit_predict_batches = parsed_args.limit_predict_batches
+        log_every_n_steps = parsed_args.log_every_n_steps
+            # Trainer instantiation
+        trainer = define_trainer(
+            trainer_class=L.Trainer,
+            profiler=profiler,
+            max_epochs=max_epochs,
+            default_root_dir=default_root_dir,
+            devices=devices,
+            accelerator=accelerator,
+            accumulate_grad_batches=accumulate_grad_batches,
+            fast_dev_run=fast_dev_run,
+            limit_train_batches=limit_train_batches,
+            limit_val_batches=limit_val_batches,
+            limit_test_batches=limit_test_batches,
+            limit_predict_batches=limit_predict_batches,
+            log_every_n_steps=log_every_n_steps,
+            callbacks=callbacks_
+        )
 
         print("Training with the following configuration:", parsed_args)
         trainer.fit(model, datamodule=data_module)
@@ -411,8 +455,39 @@ def main(args=None):
             print("Setting up data")
             data_module.setup()
         
-        # Trainer for prediction
-        trainer = L.Trainer()
+        # Instantiate callbacks
+        callbacks_ = define_callbacks(parsed_args.callbacks)
+        # Instantiate trainer
+            # Trainer specific arguments
+        profiler = parsed_args.profiler
+        max_epochs = parsed_args.max_epochs
+        default_root_dir = parsed_args.default_root_dir
+        devices = parsed_args.devices
+        accelerator = parsed_args.accelerator
+        accumulate_grad_batches = parsed_args.accumulate_grad_batches
+        fast_dev_run = parsed_args.fast_dev_run
+        limit_train_batches = parsed_args.limit_train_batches
+        limit_val_batches = parsed_args.limit_val_batches
+        limit_test_batches = parsed_args.limit_test_batches
+        limit_predict_batches = parsed_args.limit_predict_batches
+        log_every_n_steps = parsed_args.log_every_n_steps
+            # Trainer instantiation
+        trainer = define_trainer(
+            trainer_class=L.Trainer,
+            profiler=profiler,
+            max_epochs=max_epochs,
+            default_root_dir=default_root_dir,
+            devices=devices,
+            accelerator=accelerator,
+            accumulate_grad_batches=accumulate_grad_batches,
+            fast_dev_run=fast_dev_run,
+            limit_train_batches=limit_train_batches,
+            limit_val_batches=limit_val_batches,
+            limit_test_batches=limit_test_batches,
+            limit_predict_batches=limit_predict_batches,
+            log_every_n_steps=log_every_n_steps,
+            callbacks=callbacks_
+        )
 
         # Predict using neural network
         predictions = trainer.predict(model, datamodule=data_module)
