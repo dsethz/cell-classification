@@ -6,7 +6,7 @@ import lightning as L
 import pytorch_lightning as pl
 
 
-class testBlock(nn.Module):
+class testBlock(L.LightningModule):
     def __init__(self):
         super().__init__()
         self.fc = nn.Linear(10, 5)
@@ -110,4 +110,7 @@ def get_BaseNNModel2(Block, layers):
 if __name__ == '__main__':
         extra_args = {'Block': testBlock, 'layers': 3}
         model = get_nn_model('BaseNNModel2', extra_args=extra_args)
+        print(isinstance(model, L.LightningModule))
+
+        model = testBlock()
         print(isinstance(model, L.LightningModule))

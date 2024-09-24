@@ -3,8 +3,11 @@ import sys
 import argparse
 import pickle
 import pandas as pd
+from typing import Optional
+
 import lightning as L
 import pytorch_lightning as pl
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
@@ -56,15 +59,19 @@ def get_nn_model(model_name: str, extra_args: dict = None):
     if extra_args is None:
         extra_args = {}
 
+    # if hasattr(extra_args, 'block'):
+    #     print(f"Block found in extra_args: {extra_args['block']},\n Block type: {type(extra_args['block'])}")
+    #     extra_args['block'] = globals()[extra_args['block']]
+
     print(f"Creating model: {model_name} with extra_args: {extra_args}")
 
     if model_name == "BaseNNModel":
         return get_BaseNNModel() # TODO: Check if this is correct, do we have to get model = ...()?
     elif model_name == "BaseNNModel2":
-        return get_BaseNNModel2(extra_args['Block'], extra_args['layers'])
+        return get_BaseNNModel2(extra_args['layers'])
     elif model_name in ["ResNet50", "ResNet101", "ResNet152"]:
         return globals()[model_name](
-            ceil_mode=True,
+            ceil_mode=extra_args['ceil_mode'],
             num_classes=extra_args['num_classes'],
             image_channels=extra_args['image_channels'],
             padding_layer_sizes=extra_args['padding_layer_sizes']
@@ -72,7 +79,7 @@ def get_nn_model(model_name: str, extra_args: dict = None):
     elif model_name == "ResNet_custom_layers":
         return ResNet_custom_layers(
             layers=extra_args['layers'],
-            ceil_mode=True,
+            ceil_mode=extra_args['ceil_mode'],
             num_classes=extra_args['num_classes'],
             image_channels=extra_args['image_channels'],
             padding_layer_sizes=extra_args['padding_layer_sizes']
@@ -92,8 +99,8 @@ def load_data(data_dir: str, data_file: str, target: str = 'label'):
         raise ValueError("Unsupported file format. Please use CSV.")
     if target not in data.columns:
         raise ValueError(f"Target column '{target}' not found in data.")
-    X = data.drop(columns=[target])
     y = data[target]
+    X = data.drop(columns=[target])
     return X, y
 
 def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
@@ -103,7 +110,7 @@ def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
 
     data = pd.read_csv(data_path)
     data = data.dropna(axis=1)
-    
+
     if remove_label and 'label' in data.columns:
         print("Warning: 'label' column found in prediction data. Removing it by default.\nIf you want to keep the 'label' column, use the --remove_label flag.")
         data = data.drop(columns=['label'])
@@ -114,9 +121,10 @@ def train_sklearn_model(model, X, y, save_name: str, save_dir: str = "./models")
     if not isinstance(model, SklearnModelWrapper):
         raise ValueError("Model must be a SklearnModelWrapper instance")
     model.fit(X, y)
-    create_dir_if_not_exists(save_dir)
-    with open(os.path.join(save_dir, f"{save_name}.pkl"), 'wb') as f:
-        pickle.dump(model, f)
+    if save_name:
+        create_dir_if_not_exists(save_dir)
+        with open(os.path.join(save_dir, f"{save_name}.pkl"), 'wb') as f:
+            pickle.dump(model, f)
 
 def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictions", save_type: str = 'csv'):
     if not isinstance(model, SklearnModelWrapper):
@@ -180,8 +188,8 @@ def train_nn_model(args):
         'num_classes': args.num_classes if hasattr(args, 'num_classes') else None,
         'image_channels': args.image_channels if hasattr(args, 'image_channels') else None,
         'padding_layer_sizes': args.padding_layer_sizes if hasattr(args, 'padding_layer_sizes') else None,
-        'layers': args.layers if hasattr(args, 'layers') else None,
-        'Block': globals()[args.block] if hasattr(args, 'block') else None
+        'layers': args.layers if hasattr(args, 'layers') else None
+        # 'Block': globals()[args.block] if hasattr(args, 'block') else None
     })
     
     data_module = load_data_module(args)
@@ -242,10 +250,23 @@ def parse_arguments():
     nn_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
     nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
     nn_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 20, 19), help="Padding layers for ResNet")
-    nn_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers or BaseNNModel2)")
-    nn_parser.add_argument("--block", type=str, default='testBlock', help="Block type (for BaseNNModel2)") #TODO chck if this isnt passed to resnet!
-    
+    nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+    #nn_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers or BaseNNModel2)")
+    nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+
+    if not hasattr(nn_parser, 'layers'):
+        nn_parser.add_argument("--layers", type=int, default=3, help="Number of layers (for ResNet_custom_layers or BaseNNModel2)")
+
+    # Model_class specific arguments Make this work>? TODO
+    # if 'ResNet_custom_layers' in nn_parser.get_default('model_class'):
+    #     nn_parser.add_argument("--layers", nargs='+', help="Number of layers for ResNet_custom_layers")
+    # if 'BaseNNModel2' in nn_parser.get_default('model_class'):
+    #     nn_parser.add_argument("--layers", nargs='int', help="Number of layers for BaseNNModel2")
+    # if 'ResNet' in nn_parser.get_default('model_class'):
+    #     nn_parser.add_argument("--num_classes", type=int, help="Number of classes for ResNet")
+    #     nn_parser.add_argument("--image_channels", type=int, help="Image channels for ResNet")
+    #     nn_parser.add_argument("--padding_layer_sizes", type=tuple, help="Padding layer sizes for ResNet")
+
     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
     
     nn_train_parser = nn_subparsers.add_parser("train", help="Train a neural network model")
@@ -283,9 +304,10 @@ def parse_arguments():
         predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
         predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
+        predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
         predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-        predict_parser.add_argument("--remove_label", action="store_true", help="Remove 'label' column from prediction data")
+        predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
         predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
         
     return parser.parse_args()
@@ -293,18 +315,34 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     
+    # NN Branch
     if args.model_type == "nn":
         if args.command == "train":
             train_nn_model(args)
         elif args.command == "predict":
             predict_nn_model(args)
-    else:
-        X, y = load_data(args.data_dir, args.data, target=args.target)
-        model = get_model(args.model_type, class_weight=args.class_weight, max_iter=args.max_iter)
-        
+
+    # SKlearn Branch
+    elif args.model_type in ["logreg", "rf"]:
+
+        # Train sub-branch
         if args.command == "train":
+            # List of arguments that should be checked
+            required_args = ['max_iter', 'class_weight']
+            # Set any missing arguments to None
+            for arg in required_args:
+                if not hasattr(args, arg) or getattr(args, arg) is None:
+                    setattr(args, arg, None)
+
+            model = get_model(args.model_type, class_weight=args.class_weight, max_iter=args.max_iter)
+            X, y = load_data(args.data_dir, args.data, target=args.target)
             train_sklearn_model(model, X, y, args.save_name, save_dir=args.save_dir)
+        
+        # Predict sub-branch
         elif args.command == "predict":
+            model_path = os.path.join(args.model_dir, f"{args.model_file}.pkl")
+            with open(model_path, 'rb') as f:
+                model = pickle.load(f)
             X_pred = load_predict_data(args.data_dir, args.data, remove_label=args.remove_label)
             predict_sklearn_model(model, X_pred, args.save_name, save_dir=args.save_dir, save_type=args.save_type)
 

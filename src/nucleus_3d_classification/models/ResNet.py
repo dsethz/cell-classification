@@ -134,9 +134,9 @@ class ResNet(L.LightningModule):
         print(f"After MaxPool: {x.shape}")
 
         # PADDING
-        # if self.padding_layer_sizes is not None:
-        #     x = F.pad(x, self.padding_layer_sizes)  # TODO: 
-        #     print(f'After padding: {x.shape}')
+        if self.padding_layer_sizes is not None:
+            x = F.pad(x, self.padding_layer_sizes)  # TODO: change this to be adaptive
+            print(f'After padding: {x.shape}')
 
         # x = pad_to_shape(x, (2, 64, 48, 48, 48))
 
@@ -278,13 +278,13 @@ def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual
 
 def main():
     model = ResNet(block=Block, layers=[2,2,1,1], num_classes=2, image_channels=1, 
-                padding_layer_sizes=(2,2,4,3,20,19)) # TODO: Make this padding adaptive and change it to 48 48 48, but stride 1 for z before
+                padding_layer_sizes=(2,2,4,3,7,7)) # TODO: Make this padding adaptive and change it to 48 48 48, but stride 1 for z before
                 # pad_to_shape=(2, 64, 48, 48, 48))
-    print(model)
+    #print(model)
 
-    # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
-    # output = model(tensor)
-    # print(output.shape)
+    tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    output = model(tensor)
+    print(output.shape)
     #print(output)
 
 # Before avg pool torch.Size([2, 1024, 5, 10, 11])
