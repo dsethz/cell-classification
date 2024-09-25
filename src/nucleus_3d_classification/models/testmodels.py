@@ -85,27 +85,27 @@ class BaseNNModel2(L.LightningModule):
     
 
     ######
-def get_nn_model(model_name: str, extra_args: dict = None):
+# def get_nn_model(model_name: str, extra_args: dict = None):
 
-    if extra_args is None:
-        extra_args = {}
+#     if extra_args is None:
+#         extra_args = {}
 
-    if model_name == "BaseNNModel":
-        model = BaseNNModel()
-        return model
-    elif model_name == "BaseNNModel2":
-        if 'Block' not in extra_args or 'layers' not in extra_args:
-            raise ValueError("BaseNNModel2 requires 'Block' and 'layers' in extra_args.")
+#     if model_name == "BaseNNModel":
+#         model = BaseNNModel()
+#         return model
+#     elif model_name == "BaseNNModel2":
+#         if 'Block' not in extra_args or 'layers' not in extra_args:
+#             raise ValueError("BaseNNModel2 requires 'Block' and 'layers' in extra_args.")
 
-        model = BaseNNModel2(Block=extra_args['Block'], layers=extra_args['layers'])
+#         model = BaseNNModel2(Block=extra_args['Block'], layers=extra_args['layers'])
 
-        return model
+#         return model
 
 def get_BaseNNModel():
-    return BaseNNModel()
+    return BaseNNModel
 
-def get_BaseNNModel2(Block, layers):
-    return BaseNNModel2(Block=Block, layers=layers)
+def get_BaseNNModel2(layers):
+    return BaseNNModel2(layers=layers)
 
 if __name__ == '__main__':
         extra_args = {'Block': testBlock, 'layers': 3}

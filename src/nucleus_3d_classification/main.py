@@ -1,47 +1,57 @@
-######################################################################################################################
-# This script coordinates training and testing of cell segmentation with Pytorch Lightning                           #
-# Author:               Aurimas Greicius, Daniel Schirmacher                                                         #
-#                       Cell Systems Dynamics Group, D-BSSE, ETH Zurich                                              #
-# Python Version:       3.12.2                                                                                       #
-# PyTorch Version:      2.3.1                                                                                        #
-# PyTorch Lightning Version: 2.3.1                                                                                   #
-######################################################################################################################
+"""
+Flexible ML Model Argument Parser
+
+This script provides a flexible command-line interface for training and predicting with various machine learning models,
+including neural networks (nn), logistic regression (logreg), and random forests (rf).
+
+Usage:
+    python script_name.py <model_type> <command> [options]
+
+Model Types:
+    - nn: Neural Network
+    - logreg: Logistic Regression
+    - rf: Random Forest
+
+Commands:
+    - train: Train a new model
+    - predict: Make predictions using a trained model
+
+Examples:
+    1. Train a neural network with custom ResNet layers:
+       python script_name.py nn train --model_class ResNet_custom_layers --layers 4 1 2 2
+
+    2. Train a neural network with BaseNNModel2:
+       python script_name.py nn train --model_class BaseNNModel2 --layers 3
+
+    3. Train a logistic regression model:
+       python script_name.py logreg train --data train_data.csv
+
+    4. Make predictions with a trained random forest model:
+       python script_name.py rf predict --model_file rf_model.pkl --data test_data.csv
+
+For more detailed information on available options for each model type and command,
+use the --help flag:
+    python script_name.py <model_type> <command> --help
+"""
 
 import os
 import sys
-from typing import List, Optional
 import argparse
+import pickle
+import pandas as pd
+from typing import Optional
+
 import lightning as L
 import pytorch_lightning as pl
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
-import pandas as pd
-import pickle
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, TensorDataset, random_split
-import torch
-import json
-from pytorch_lightning.loggers import TensorBoardLogger
-from lightning.pytorch.callbacks import Callback
-
-# Tensorboard
-import tensorboard
 
 from utils.testdatamodule import BaseDataModule
-from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
-
-import argparse
-import os
-import sys
-from datetime import datetime
-
-import pytorch_lightning as pl
-import torch
-
 from utils.datamodule import CustomDataModule
-from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet, Block, ResNet_custom_layers
+from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
+from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
 '''
 NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented 
@@ -58,6 +68,10 @@ Otherwise maxpool will not work on MPS device
 
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
+        
+        if not isinstance(model, BaseEstimator):
+            raise ValueError("Model must be a scikit-learn estimator")
+
         self.model = model
 
     def fit(self, X, y):
@@ -65,124 +79,113 @@ class SklearnModelWrapper:
 
     def predict(self, X):
         return self.model.predict(X)
-    
+
 def create_dir_if_not_exists(dir_path: str):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
 def get_model(model_name: str, class_weight: Optional[str] = None, max_iter: int = 1000):
+    class_weight = None if class_weight == "None" else class_weight
     if model_name == "rf":
         return SklearnModelWrapper(RandomForestClassifier(class_weight=class_weight))
     elif model_name == "logreg":
         return SklearnModelWrapper(LogisticRegression(class_weight=class_weight, max_iter=max_iter))
 
+# NN model instance creation
 def get_nn_model(model_name: str, extra_args: dict = None):
-
     if extra_args is None:
-        extra_args = 'None'
+        extra_args = {}
+
+    print(f'{type(extra_args['layers'])}')
+
+    # if hasattr(extra_args, 'block'):
+    #     print(f"Block found in extra_args: {extra_args['block']},\n Block type: {type(extra_args['block'])}")
+    #     extra_args['block'] = globals()[extra_args['block']]
 
     print(f"Creating model: {model_name} with extra_args: {extra_args}")
 
     if model_name == "BaseNNModel":
-        model = get_BaseNNModel()
-        print(f'Created model instance: {model}')
-        print(f'Model is of type: {type(model)}')
-        return model
+        return BaseNNModel() # TODO: Check if this is correct, do we have to get model = ...()?
     elif model_name == "BaseNNModel2":
-        if 'Block' not in extra_args or 'layers' not in extra_args:
-            raise ValueError("BaseNNModel2 requires 'Block' and 'layers' in extra_args.")
-
-        model = get_BaseNNModel2(extra_args['Block'], extra_args['layers'])
-
-        return model
-    elif model_name == "ResNet50":
-        return ResNet50(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
-    elif model_name == "ResNet101":
-        return ResNet101(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
-    elif model_name == "ResNet152":
-        return ResNet152(ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
+        return BaseNNModel2(layers = extra_args['layers'])
+    elif model_name in ["ResNet50", "ResNet101", "ResNet152"]:
+        return globals()[model_name](
+            ceil_mode=extra_args['ceil_mode'],
+            num_classes=extra_args['num_classes'],
+            image_channels=extra_args['image_channels'],
+            padding_layer_sizes=extra_args['padding_layer_sizes']
+        )
     elif model_name == "ResNet_custom_layers":
-        return ResNet_custom_layers(layers=extra_args['layers'], ceil_mode=True, num_classes=extra_args['num_classes'], image_channels=extra_args['image_channels'], padding_layer_sizes=extra_args['padding_layer_sizes'])
-    
+        return ResNet_custom_layers(
+            layers=extra_args['layers'],
+            ceil_mode=extra_args['ceil_mode'],
+            num_classes=extra_args['num_classes'],
+            image_channels=extra_args['image_channels'],
+            padding_layer_sizes=extra_args['padding_layer_sizes']
+        )
 
 def get_nn_model_class(model_name: str):
-    if model_name == "ResNet50":
-        return ResNet50
-    elif model_name == "ResNet101":
-        return ResNet101
-    elif model_name == "ResNet152":
-        return ResNet152
-    elif model_name == "ResNet_custom_layers":
-        return ResNet_custom_layers
-    elif model_name == "BaseNNModel":
-        return BaseNNModel
-    elif model_name == "BaseNNModel2":
-        return BaseNNModel2
+    if model_name not in globals():
+        raise ValueError(f"Model class {model_name} not found, or input is not valid.\nPlease use one of the following: {list(globals().keys())}") # TODO: Check if this is correct
+    return globals()[model_name]
 
-def load_data(data_dir:str, data_file: str, target: str):
-    # Implement data loading for RF and LogReg
-    if target is None:
-        target = 'label'
-    # Load data from data_file
-    if data_dir is None:
-        data_dir = "./data"
+def load_data(data_dir: str, data_file: str, target: str = 'label'):
+    data_path = os.path.join(data_dir, data_file)
     if data_file.endswith('.csv'):
-        data = pd.read_csv(os.path.join(data_dir, data_file))
-        # Remove columns with missing values
-        data = data.dropna(axis=1)
-    # Split into X and y
-    X = data.drop(columns=[target])
+        data = pd.read_csv(data_path)
+        data = data.dropna(axis=1) # Drop columns with NaN values
+    else:
+        raise ValueError("Unsupported file format. Please use CSV.")
+    if target not in data.columns:
+        raise ValueError(f"Target column '{target}' not found in data.")
     y = data[target]
+    X = data.drop(columns=[target])
     return X, y
 
-def load_predict_data(data_dir:str, data_file: str, remove_label: bool = True):
-    # Implement data loading for RF and LogReg
-    if data_dir is None:
-        data_dir = "./data"
-    
+def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
+    data_path = os.path.join(data_dir, data_file)
     if not data_file.endswith('.csv'):
         raise ValueError("Prediction data must be a CSV file")
 
-    if data_file.endswith('.csv'):
-        data = pd.read_csv(os.path.join(data_dir, data_file))
-        # Remove columns with missing values
-        data = data.dropna(axis=1)
-        # If theres a 'label' column, remove it, and print that it was removed by default!
-        if 'label' in data.columns:
-            print("Warning: 'label' column found in prediction data. Removing it by default. Set remove_label=False to keep it.")
-            data = data.drop(columns=['label'])
+    data = pd.read_csv(data_path)
+    data = data.dropna(axis=1)
+
+    if remove_label and 'label' in data.columns:
+        print("Warning: 'label' column found in prediction data. Removing it by default.\nIf you want to keep the 'label' column, use the --remove_label flag.")
+        data = data.drop(columns=['label'])
+    
     return data
 
-def train(model, X, y, save_name: str = None, save_dir: str = "./models"):
-    if isinstance(model, SklearnModelWrapper):
-        model.fit(X, y)
-        # Save the model
-        if save_name:
-            create_dir_if_not_exists(save_dir)
-            with open(os.path.join(save_dir, f"{save_name}.pkl"), 'wb') as f:
-                pickle.dump(model, f)
+def train_sklearn_model(model, X, y, save_name: str, save_dir: str = "./models"):
+    if not isinstance(model, SklearnModelWrapper):
+        raise ValueError("Model must be a SklearnModelWrapper instance")
+    model.fit(X, y)
+    if save_name:
+        create_dir_if_not_exists(save_dir)
+        with open(os.path.join(save_dir, f"{save_name}.pkl"), 'wb') as f:
+            pickle.dump(model, f)
 
-def predict(model, X, save_name: str = None, save_dir: str = "./predictions", save_type: str = 'csv'):
-    if isinstance(model, SklearnModelWrapper):
-        # Predict using the model
-        y = model.predict(X)
-        # Save the predictions
-        if save_name:
-            create_dir_if_not_exists(save_dir)
-            if save_type == 'csv':
-                pd.DataFrame(y).to_csv(os.path.join(save_dir, f"{save_name}.csv"), index=False)
-            elif save_type == 'pkl':
-                with open(os.path.join(save_dir, f"{save_name}.pkl"), 'wb') as f:
-                    pickle.dump(y, f)
-        return model.predict(X)
+def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictions", save_type: str = 'csv'):
+    if not isinstance(model, SklearnModelWrapper):
+        raise ValueError("Model must be a SklearnModelWrapper instance")
+    y = model.predict(X)
+    create_dir_if_not_exists(save_dir)
+    save_path = os.path.join(save_dir, f"{save_name}.{save_type}")
+    
+    if save_type == 'csv':
+        pd.DataFrame(y).to_csv(save_path, index=False)
+    elif save_type == 'pkl':
+        with open(save_path, 'wb') as f:
+            pickle.dump(y, f)
+            
+    print(f"Predictions saved to {save_path} as {save_type}")
+    
+    return y
 
-## Experimenting with Pytorch Lightning ####################################################################################################
-
-    # TODO: Implement the following functions
-
-def define_callbacks(callback_names: List[str]) -> List[pl.Callback]:
+# TODO: Expand this to include more callbacks
+def define_callbacks(callback_names: list):
     callbacks = []
-    for callback_name in callback_names:
+    for callback_name in callback_names if callback_names is not None else []:
         if callback_name == "early_stopping":
             callbacks.append(pl.callbacks.EarlyStopping(monitor='val_loss'))
         elif callback_name == "model_checkpoint":
@@ -191,355 +194,295 @@ def define_callbacks(callback_names: List[str]) -> List[pl.Callback]:
             callbacks.append(pl.callbacks.LearningRateMonitor())
     return callbacks
 
-def define_trainer(
-        trainer_class, profiler: bool = False, 
-        max_epochs: int = 10, 
-        default_root_dir: str = "./logs",
-        logger: pl.loggers.Logger = TensorBoardLogger,
-        devices: str = "auto",
-        accelerator: str = "auto",
-        enable_checkpointing: bool = True,
-        enable_early_stopping: bool = True,
-        accumulate_grad_batches: int = 1,
-        fast_dev_run: bool = False,
-        limit_train_batches: int = 1.0,
-        limit_val_batches: int = 1.0,
-        limit_test_batches: int = 1.0,
-        limit_predict_batches: int = 1.0,
-        log_every_n_steps: int = 5,
-        callbacks: List[pl.Callback] = None
-        ):
-    # Define the trainer based on the arguments
-    trainer = trainer_class(
-        profiler=profiler,
-        max_epochs=max_epochs,
-        default_root_dir=default_root_dir,
-        logger=logger,
-        devices=devices,
-        accelerator=accelerator,
-        enable_checkpointing=enable_checkpointing,
-        enable_early_stopping=enable_early_stopping,
-        accumulate_grad_batches=accumulate_grad_batches,
-        fast_dev_run=fast_dev_run,
-        limit_train_batches=limit_train_batches,
-        limit_val_batches=limit_val_batches,
-        limit_test_batches=limit_test_batches,
-        limit_predict_batches=limit_predict_batches,
-        log_every_n_steps=log_every_n_steps,
-        callbacks=callbacks
-    )
-    return trainer
+def define_trainer(args, callbacks=None):
+    trainer_kwargs = {
+        'profiler': args.profiler,
+        'max_epochs': args.max_epochs,
+        'default_root_dir': args.default_root_dir,
+        'devices': args.devices,
+        'accelerator': args.accelerator,
+        'accumulate_grad_batches': args.accumulate_grad_batches,
+        'fast_dev_run': args.fast_dev_run,
+        'limit_train_batches': args.limit_train_batches,
+        'limit_val_batches': args.limit_val_batches,
+        'limit_test_batches': args.limit_test_batches,
+        'limit_predict_batches': args.limit_predict_batches,
+        'log_every_n_steps': args.log_every_n_steps,
+        'callbacks': callbacks
+    }
+    return L.Trainer(**trainer_kwargs)
 
-######################################################################################################################
+def load_data_module(args):
+    if args.data_module == "BaseDataModule":
+        data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
+    elif args.data_module == "CustomDataModule":
+        data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
+    else:
+        raise ValueError(f"Unknown data module: {args.data_module}")
+    
+    data_module.prepare_data()
+    data_module.setup()
+    return data_module
+
+def train_nn_model(args, model):
+    
+    data_module = load_data_module(args)
+    callbacks = define_callbacks(args.callbacks)
+    trainer = define_trainer(args, callbacks)
+    
+    print("Training with the following configuration:", args)
+    trainer.fit(model, datamodule=data_module)
+
+    # TODO: Add and expand on this, to save more info> Callbacks should take care of this, but check!
+    create_dir_if_not_exists(args.save_dir)
+    trainer.save_checkpoint(os.path.join(args.save_dir, f"{args.save_name}.ckpt"))
+    # Saving last checkpoint
+    print(f"Last model saved to {args.save_dir}")
+
+def predict_nn_model(args):
+    model_class = get_nn_model_class(args.model_class)
+    model = model_class.load_from_checkpoint(os.path.join(args.model_dir, f"{args.model_file}.ckpt"))
+    
+    data_module = load_data_module(args)
+    trainer = define_trainer(args)
+    
+    predictions = trainer.predict(model, datamodule=data_module)
+    save_predictions(predictions, args)
+    print("Predictions complete")
+
+def save_predictions(predictions, args):
+    create_dir_if_not_exists(args.save_dir)
+    save_path = os.path.join(args.save_dir, f"{args.save_name}.{args.save_type}")
+    
+    if args.save_type == 'csv':
+        pd.DataFrame(predictions).to_csv(save_path, index=False)
+    elif args.save_type == 'pkl':
+        with open(save_path, 'wb') as f:
+            pickle.dump(predictions, f)
+    
+    print(f"Predictions saved to {save_path}")
 
 
-def main(args=None):
+def parse_arguments():
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
-
-    # Model type argument (nn, logreg, rf)
+    
+    # First level: model type
     subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
 
-    # Subparser for neural networks
+    # Neural Network parser
     nn_parser = subparsers.add_parser('nn', help="Neural network model options")
-    
-        # Neural network-specific arguments - trainer options
-    nn_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
-    nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
-    nn_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
-    nn_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
-    nn_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
-    nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
-    nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-    nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
-    nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
-    nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
-    nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
-    nn_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
-        # Neural network-specific arguments - callbacks
-    nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
-
-        # Subparsers for 'train' and 'predict' under 'nn'
     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
 
-    # Neural network-specific training options
-    nn_train_parser = nn_subparsers.add_parser("train", help="Train a neural network model")
+    # Common NN arguments
+    nn_common_parser = argparse.ArgumentParser(add_help=False)
+    nn_common_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+    nn_common_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+    nn_common_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
+    nn_common_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
+    nn_common_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
+    nn_common_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
+    nn_common_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+    nn_common_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+    nn_common_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+    nn_common_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
+    nn_common_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+    nn_common_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
+    nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
+    nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+    nn_common_parser.add_argument("--model_class", type=str, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
+    nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+    nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+    nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+    nn_common_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+    nn_common_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+
+    # NN Train parser
+    nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
+    nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
     nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
-    nn_train_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-    # nn_train_parser.add_argument("--data_module_setup", type=str, help="Data module setup file (json) (full path)") # TODO: Implement this   
-    #nn_train_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
-    #nn_train_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
-    
-    nn_train_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=[
-        'ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'
-    ], help="Model class to use")
+    nn_train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+    nn_train_parser.add_argument("--save_name", type=str, default="nn_model", help="Filename for saved model")
 
-    # Additional ResNet-specific arguments
-    nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
-    nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 20, 19), help="Padding layers for ResNet")
-
-    # Check what argument model_class is and add the appropriate arguments
-    # To check, we first have to parse the arguments
-    nn_train_args, _ = nn_train_parser.parse_known_args()
-    if nn_train_args.model_class in ["ResNet_custom_layers"]:
-        nn_train_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers)")
-    elif nn_train_args.model_class == "BaseNNModel2":
-        nn_train_parser.add_argument("--layers", type=int, default=3, help="Number of layers (for BaseNNModel2)")
-        nn_train_parser.add_argument("--block", type=str, default='testBlock', help="Block type (for BaseNNModel2)")
-
-    # Neural network-specific prediction options
-    nn_predict_parser = nn_subparsers.add_parser("predict", help="Predict using a neural network model")
-    nn_predict_parser.add_argument("--model_class", type=str, default='BaseNNModel2', choices=[
-        'ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'
-    ], help="Model class to use")
-    nn_predict_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-    #nn_predict_parser.add_argument("--data_module_setup", type=str, help="Data module setup file (json) (full path)") # TODO: Implement this   
+    # NN Predict parser
+    nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
+    nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-    nn_predict_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for prediction") # TODO: Doesnt work when you use a setup file!
     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
 
-    # Subparser for logistic regression and random forest
+    # Scikit-learn parsers (logreg and rf)
     for model_type in ['logreg', 'rf']:
         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
-
-        # Subparsers for 'train' and 'predict' under 'logreg' or 'rf'
         model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
-
-        # Training options for scikit-learn models
+        
+        # Train parser
         train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
         train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
         train_parser.add_argument("--data", type=str, required=True, help="Data file")
         train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
         train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-        train_parser.add_argument("--class_weight", type=str, choices=["balanced", None], default="balanced", help="Class weight for classification")
+        train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+        train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
+        
         if model_type == "logreg":
-            train_parser.add_argument("--save_name", type=str, default='logreg_model', help="Filename for saved model")
             train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
-        elif model_type == "rf":
-            train_parser.add_argument("--save_name", type=str, default='rf_model', help="Filename for saved model")
-
-        # Prediction options for scikit-learn models
+        
+        # Predict parser
         predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
         predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
         predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
         predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
+        predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-        predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='csv', help="Save predictions as CSV or pickle")
-        predict_parser.add_argument("--remove_label", type=bool, default=True, help="Remove 'label' column from prediction data, if it exists")
+        predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+        predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
+        predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
 
-    # Parse arguments
-    if args is None:
-        args = sys.argv[1:]
-    parsed_args = parser.parse_args(args)
+    args = parser.parse_args()
+    return args
 
-    # If Namespace object has no attribute 'max_iter', set it to 1
-    if not hasattr(parsed_args, 'max_iter'):
-        parsed_args.max_iter = 1
+def process_layers_argument(args):
+    """
+    Process the --layers argument based on the model_class.
+    For ResNet_custom_layers, interpret it as [layer1, layer2, layer3, layer4].
+    For BaseNNModel2, interpret it as a single integer for the number of layers.
+    """
+    if args.model_class == 'ResNet_custom_layers':
+        if args.layers is None or len(args.layers) != 4:
+            raise ValueError("ResNet_custom_layers requires exactly 4 layer values")
+        args.layers = args.layers  # Keep as a list of 4 integers
+    elif args.model_class == 'BaseNNModel2':
+        if args.layers is None or len(args.layers) != 1:
+            raise ValueError("BaseNNModel2 requires a single integer for the number of layers")
+        args.layers = args.layers[0]  # Convert to a single integer
+    return args
 
-    # Neural network training logic
-    if parsed_args.model_type == "nn" and parsed_args.command == "train":
-        model_class = parsed_args.model_class
+# def parse_arguments():
+#     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
+#     subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
 
-        # ResNet models
-        if model_class.startswith("ResNet"):
+#     # Neural Network parser
+#     nn_parser = subparsers.add_parser('nn', help="Neural network model options")
+#     nn_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+#     nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+#     nn_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
+#     nn_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
+#     nn_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
+#     nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
+#     nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+#     nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+#     nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+#     nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
+#     nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+#     nn_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
+#     nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
+#     nn_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+#     nn_parser.add_argument("--model_class", type=str, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
+#     nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+#     nn_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+#     nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+#     nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+#     nn_parser.add_argument("--layers", nargs='+', default=[1,1,1,1], help="Number of layers for ResNet_custom_layers")
+#     nn_parser.add_argument("--test_layer", type=int, default=3, help="Test layer for ResNet_custom_layers")
 
-            if not hasattr(parsed_args, 'layers'):
-                layers = None
-            else:
-                layers = parsed_args.layers
-            
-            # layers = parsed_args.layers if parsed_args.layers else [1, 1, 1, 1]
+#     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
+    
+#     nn_train_parser = nn_subparsers.add_parser("train", help="Train a neural network model")
+#     nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#     nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+#     nn_train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+#     nn_train_parser.add_argument("--save_name", type=str, default="model", help="Filename for saved model")
 
-            model = get_nn_model(model_class, {
-                "num_classes": parsed_args.num_classes,
-                "image_channels": parsed_args.image_channels,
-                "padding_layer_sizes": parsed_args.padding_layer_sizes,
-                "layers": layers
-            })
-        elif model_class in ["BaseNNModel", "BaseNNModel2"]:
-            # BaseNNModel and BaseNNModel2
+#     nn_predict_parser = nn_subparsers.add_parser("predict", help="Predict using a neural network model")
+#     nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
+#     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
+#     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+#     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+#     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
 
-            if model_class == "BaseNNModel2":
-                block = parsed_args.block or 'testBlock' # Default to testBlock for BaseNNModel2
-                if block == "testBlock":
-                    block = testBlock
-                layers = parsed_args.layers or 3 # Default to 3 layers for BaseNNModel2
-                model = get_nn_model(model_class, {'layers': layers, 'Block': block})
-            elif model_class == "BaseNNModel":
-                model = get_nn_model(model_class)
-
-        # Data module setup for neural network
-        if parsed_args.data_module == "BaseDataModule":
-            data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
-            data_module.setup()
-
-        elif parsed_args.data_module == "CustomDataModule":
-            data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
-            print("Preparing data")
-            data_module.prepare_data()
-            print("Setting up data")
-            data_module.setup()
-
-        # Instantiate callbacks
-        callbacks_ = define_callbacks(parsed_args.callbacks)
-        # Instantiate trainer
-            # Trainer specific arguments
-        profiler = parsed_args.profiler
-        max_epochs = parsed_args.max_epochs
-        default_root_dir = parsed_args.default_root_dir
-        devices = parsed_args.devices
-        accelerator = parsed_args.accelerator
-        accumulate_grad_batches = parsed_args.accumulate_grad_batches
-        fast_dev_run = parsed_args.fast_dev_run
-        limit_train_batches = parsed_args.limit_train_batches
-        limit_val_batches = parsed_args.limit_val_batches
-        limit_test_batches = parsed_args.limit_test_batches
-        limit_predict_batches = parsed_args.limit_predict_batches
-        log_every_n_steps = parsed_args.log_every_n_steps
-            # Trainer instantiation
-        trainer = define_trainer(
-            trainer_class=L.Trainer,
-            profiler=profiler,
-            max_epochs=max_epochs,
-            default_root_dir=default_root_dir,
-            devices=devices,
-            accelerator=accelerator,
-            accumulate_grad_batches=accumulate_grad_batches,
-            fast_dev_run=fast_dev_run,
-            limit_train_batches=limit_train_batches,
-            limit_val_batches=limit_val_batches,
-            limit_test_batches=limit_test_batches,
-            limit_predict_batches=limit_predict_batches,
-            log_every_n_steps=log_every_n_steps,
-            callbacks=callbacks_
-        )
-
-        print("Training with the following configuration:", parsed_args)
-        trainer.fit(model, datamodule=data_module)
-
-    # Neural network prediction logic
-    elif parsed_args.model_type == "nn" and parsed_args.command == "predict":
-
-        # Check what argument model_class is and add the appropriate arguments
-        # To check, we first have to parse the arguments
-        nn_predict_args, _ = nn_predict_parser.parse_known_args()
-        if nn_predict_args.model_class == "ResNet_custom_layers":
-            nn_predict_parser.add_argument("--layers", nargs='+', help="Number of layers (for ResNet_custom_layers)")
-        elif nn_predict_args.model_class == "BaseNNModel2":
-            nn_predict_parser.add_argument("--layers", type=int, default=3, help="Number of layers (for BaseNNModel2)")
-            nn_predict_parser.add_argument("--block", type=str, default='testBlock', help="Block type (for BaseNNModel2)")
+#     # Scikit-learn parsers
+#     for model_type in ['logreg', 'rf']:
+#         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
+#         model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
         
-        nn_predict_args, _ = nn_predict_parser.parse_known_args()
-        # Get model class
-        model_class = nn_predict_args.model_class
-        # Load model
-        model = get_nn_model_class(model_class).load_from_checkpoint(os.path.join(nn_predict_args.model_dir, f"{nn_predict_args.model_file}.ckpt"))
+#         train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
+#         train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#         train_parser.add_argument("--data", type=str, required=True, help="Data file")
+#         train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+#         train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#         train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+#         train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
         
-            # // TODO: Currently, we cannot return class with a different than default block, because we cannot pass the block to the model
-
-        # Load data module for prediction
-        if parsed_args.data_module == "BaseDataModule":
-            data_module = BaseDataModule(data_dir="./data", batch_size=parsed_args.batch_size)
-            data_module.setup()
-
-        elif parsed_args.data_module == "CustomDataModule": # TODO: Allow this to be passed in separate file?
-            
-            data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
-            print("Preparing data")
-            data_module.prepare_data()
-
-            print("Setting up data")
-            data_module.setup()
+#         if model_type == "logreg":
+#             train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
         
-        # Instantiate callbacks
-        callbacks_ = define_callbacks(parsed_args.callbacks)
-        # Instantiate trainer
-            # Trainer specific arguments
-        profiler = parsed_args.profiler
-        max_epochs = parsed_args.max_epochs
-        default_root_dir = parsed_args.default_root_dir
-        devices = parsed_args.devices
-        accelerator = parsed_args.accelerator
-        accumulate_grad_batches = parsed_args.accumulate_grad_batches
-        fast_dev_run = parsed_args.fast_dev_run
-        limit_train_batches = parsed_args.limit_train_batches
-        limit_val_batches = parsed_args.limit_val_batches
-        limit_test_batches = parsed_args.limit_test_batches
-        limit_predict_batches = parsed_args.limit_predict_batches
-        log_every_n_steps = parsed_args.log_every_n_steps
-            # Trainer instantiation
-        trainer = define_trainer(
-            trainer_class=L.Trainer,
-            profiler=profiler,
-            max_epochs=max_epochs,
-            default_root_dir=default_root_dir,
-            devices=devices,
-            accelerator=accelerator,
-            accumulate_grad_batches=accumulate_grad_batches,
-            fast_dev_run=fast_dev_run,
-            limit_train_batches=limit_train_batches,
-            limit_val_batches=limit_val_batches,
-            limit_test_batches=limit_test_batches,
-            limit_predict_batches=limit_predict_batches,
-            log_every_n_steps=log_every_n_steps,
-            callbacks=callbacks_
-        )
+#         predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
+#         predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+#         predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+#         predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
+#         predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#         predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+#         predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
+#         predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
 
-        # Predict using neural network
-        predictions = trainer.predict(model, datamodule=data_module)
-        create_dir_if_not_exists(parsed_args.save_dir)
+#     args = parser.parse_args()
+#     return args
 
-        # Save predictions with the specified save type
-        if parsed_args.save_type == 'csv':
-            pd.DataFrame(predictions).to_csv(os.path.join(parsed_args.save_dir, f"{parsed_args.save_name}.csv"), index=False)
-        elif parsed_args.save_type == 'pkl':
-            with open(os.path.join(parsed_args.save_dir, f"{parsed_args.save_name}.pkl"), 'wb') as f:
-                pickle.dump(predictions, f)
+def get_extra_args(args):
+    extra_args = {
+                'ceil_mode': args.ceil_mode,
+                'num_classes': args.num_classes,
+                'image_channels': args.image_channels,
+                'padding_layer_sizes': args.padding_layer_sizes,
+                'layers': args.layers,
+                'padding_layer_sizes': args.padding_layer_sizes
+                }
+    return extra_args
 
-    # Scikit-learn training logic (Random Forest / Logistic Regression)
-    elif parsed_args.model_type in ["rf", "logreg"] and parsed_args.command == "train":
-        model = get_model(parsed_args.model_type, class_weight=parsed_args.class_weight, max_iter=parsed_args.max_iter)
-        X, y = load_data(parsed_args.data_dir, parsed_args.data, parsed_args.target)
-        train(model, X, y, save_name=parsed_args.save_name, save_dir=parsed_args.save_dir)
+def main():
+    args = parse_arguments()
+    
+    # NN Branch
+    if args.model_type == "nn":
+        
+        if args.model_class in ['ResNet_custom_layers', 'BaseNNModel2']:
+            args = process_layers_argument(args)
 
-    # Scikit-learn prediction logic (Random Forest / Logistic Regression)
-    elif parsed_args.model_type in ["rf", "logreg"] and parsed_args.command == "predict":
-        model_file = os.path.join(parsed_args.model_dir, f"{parsed_args.model_file}.pkl")
-        with open(model_file, "rb") as f:
-            model = pickle.load(f)
+        if args.command == "train":
+            extra_args = get_extra_args(args)
+            train_nn_model(args, model=get_nn_model(args.model_class, extra_args))
+        elif args.command == "predict":
+            predict_nn_model(args)
 
-        X = load_predict_data(parsed_args.data_dir, parsed_args.data, remove_label=parsed_args.remove_label)
-        predictions = predict(model, X, save_name=parsed_args.save_name, save_type=parsed_args.save_type)
-        print(predictions)
+    # SKlearn Branch
+    elif args.model_type in ["logreg", "rf"]:
+
+        # Train sub-branch
+        if args.command == "train":
+            # List of arguments that should be checked
+            required_args = ['max_iter', 'class_weight']
+            # Set any missing arguments to None
+            for arg in required_args:
+                if not hasattr(args, arg) or getattr(args, arg) is None:
+                    setattr(args, arg, None)
+
+            model = get_model(args.model_type, class_weight=args.class_weight, max_iter=args.max_iter)
+            X, y = load_data(args.data_dir, args.data, target=args.target)
+            train_sklearn_model(model, X, y, args.save_name, save_dir=args.save_dir)
+        
+        # Predict sub-branch
+        elif args.command == "predict":
+            model_path = os.path.join(args.model_dir, f"{args.model_file}.pkl")
+            with open(model_path, 'rb') as f:
+                model = pickle.load(f)
+            X_pred = load_predict_data(args.data_dir, args.data, remove_label=args.remove_label)
+            predict_sklearn_model(model, X_pred, args.save_name, save_dir=args.save_dir, save_type=args.save_type)
 
 if __name__ == "__main__":
-    # model = ResNet50(num_classes=2, image_channels=1, padding_layer_sizes=(2,2,4,3,20,19))
-    # #print(model)
-
-    # # tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
-    # #output = model(tensor)
-    # #print(output.shape)
-    # #print(output)
-
-    # data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
-    # data_module.prepare_data()
-    # data_module.setup()
-
-    # train_loader = data_module.train_dataloader()
-
-    # dataiter = iter(train_loader)
-    # images, labels = next(dataiter)
-    # print(images.shape)
-
-    # y = model(images)
-    # print(y.shape)
-    # print(y)
-
-    # from utils.show_slice import show_slice
-    # show_slice(images[0, 0, :, :, :])
-    
     main()
