@@ -62,12 +62,17 @@ class ResNet(L.LightningModule):
         '''
 
         # Variables
-
         self.initial_out_channels = 64
         self.in_channels = self.initial_out_channels
         self.padding_layer_sizes = padding_layer_sizes
         self.learning_rate = learning_rate
         self.ceil_mode = ceil_mode
+
+        # Initialize TP, FP, TN, FN counters
+        self.tp = 0
+        self.fp = 0
+        self.tn = 0
+        self.fn = 0
 
         # Save Hyperparameters
         self.save_hyperparameters()
@@ -188,19 +193,43 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         Test_step_loss = loss_fn(y_hat, y)
 
-        # TODO: Fix this
-        # # Calculate accuracy, precision, recall
-        # test_acc = (x.argmax(dim=1) == y).float().mean()
-        # test_precision = (x.argmax(dim=1) == y).float().mean()
-        # test_recall = (x.argmax(dim=1) == y).float().mean()
+        # Apply softmax to get probabilities
+        #y_pred_proba = torch.softmax(y_hat, dim=1)
         
-        # values = {"test_loss": Test_step_loss, "test_accuracy": test_acc, "test_precision": test_precision, "test_recall": test_recall}
+        # Get predicted class
+        y_pred_class = torch.argmax(y_hat, dim=1)
 
-        # # Log the validation loss
-        # self.log_dict(values,
-        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+        # Flatten tensors for comparison if they have extra dimensions
+        y = y.view(-1)
+        predicted_classes = y_pred_class.view(-1)
+
+        # Calculate TP, FP, TN, FN
+        self.tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
+        self.fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
+        self.tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
+        self.fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
+                # Optional: print for debugging purposes
+        #print(f"Predicted: {predicted_classes}, True: {y}")
 
         return Test_step_loss
+    
+    def on_test_epoch_end(self):
+        # Calculate accuracy, precision, recall, etc.
+        total = self.tp + self.fp + self.tn + self.fn
+        accuracy = (self.tp + self.tn) / total if total > 0 else 0
+        precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
+        recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        # Log or print your metrics
+        self.log('test_accuracy', accuracy, on_epoch=True, sync_dist=True)
+        self.log('test_precision', precision, on_epoch=True, sync_dist=True)
+        self.log('test_recall', recall, on_epoch=True, sync_dist=True)
+        self.log('test_f1_score', f1_score, on_epoch=True, sync_dist=True)
+
+        # Print for debugging
+        print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
+
     
     def predict_step(self, x):
         # TODO: Check this out
