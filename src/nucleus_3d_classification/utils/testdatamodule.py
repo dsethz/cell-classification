@@ -4,6 +4,8 @@ import lightning as L
 from torch.utils.data import DataLoader, TensorDataset, random_split
 from typing import Optional
 
+torch.manual_seed(42)
+
 class BaseDataModule(L.LightningDataModule):
     def __init__(self, data_dir: str = "./data", batch_size: int = 32):
         super().__init__()
@@ -23,14 +25,20 @@ class BaseDataModule(L.LightningDataModule):
 
         # Create random tensors for features (X) and labels (y)
         X = torch.randn(num_samples, num_features)
-        y = torch.randint(0, num_classes, (num_samples,))
+        weights = torch.tensor([1.5, -2.0, 1.0, 0.5, -0.8])
+        linear_combination = X[:, :5] @ weights + 0.1 * torch.sin(X[:, :5]).sum(dim=1)
+        probabilities = torch.sigmoid(linear_combination)
+        noise = 0.1 * torch.randn(num_samples)
+        linear_combination += noise
+        y = (probabilities > 0.5).long()
+        #y = torch.randint(0, num_classes, (num_samples,))
 
         # Wrap data into a TensorDataset
         dataset = TensorDataset(X, y)
 
         # Split into training, validation, and test datasets
         train_size = int(0.7 * len(dataset))
-        val_size = int(0.15 * len(dataset))
+        val_size = int(0.295 * len(dataset))
         test_size = len(dataset) - train_size - val_size
 
         self.train_dataset, self.val_dataset, self.test_dataset = random_split(dataset, [train_size, val_size, test_size])

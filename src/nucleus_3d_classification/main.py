@@ -53,6 +53,9 @@ from utils.datamodule import CustomDataModule
 from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
+from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
+
+import tensorboard
 '''
 NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented 
 for the MPS device. If you want this op to be added in priority during the prototype phase of this feature, 
@@ -182,8 +185,11 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
     
     return y
 
-# TODO: Expand this to include more callbacks
-def define_callbacks(callback_names: list):
+def define_callbacks(args, callback_names: list):
+
+    # Making the checkpointing callback here:
+
+
     callbacks = []
     for callback_name in callback_names if callback_names is not None else []:
         if callback_name == "early_stopping":
@@ -192,7 +198,46 @@ def define_callbacks(callback_names: list):
             callbacks.append(pl.callbacks.ModelCheckpoint(monitor='val_loss'))
         elif callback_name == "lr_monitor":
             callbacks.append(pl.callbacks.LearningRateMonitor())
+        elif callback_name == "BatchSizeFinder":
+            callbacks.append(FineTuneBatchSizeFinder())
+    
+    checkpoint_callback = create_checkpoint_callback(args)
+    callbacks.append(checkpoint_callback)
+
     return callbacks
+
+def create_checkpoint_callback(args):
+    args.filename = replace_filename(args)
+
+    # Dirpath -> check if exists, if not, create it
+    create_dir_if_not_exists(args.dirpath)
+
+    return ModelCheckpoint(
+        save_top_k=args.save_top_k,
+        monitor=args.monitor,
+        mode=args.mode,
+        dirpath=args.dirpath,
+        filename=args.filename # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
+    )
+
+def replace_filename(args):
+    filename = args.filename
+    filename = filename.replace("model_name", args.model_class)
+    filename = filename.replace("data_module_name", args.data_module)
+    filename = filename.replace("epoch", "{epoch:02d}")
+    filename = filename.replace("val_loss", "{val_loss:.2f}")
+    return filename
+
+class FineTuneBatchSizeFinder(BatchSizeFinder):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def on_fit_start(self, *args, **kwargs):
+        return
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        if trainer.current_epoch in [0, 1, 2]:
+            self.scale_batch_size(trainer, pl_module)
 
 def define_trainer(args, callbacks=None):
     trainer_kwargs = {
@@ -208,8 +253,11 @@ def define_trainer(args, callbacks=None):
         'limit_test_batches': args.limit_test_batches,
         'limit_predict_batches': args.limit_predict_batches,
         'log_every_n_steps': args.log_every_n_steps,
+        'sync_batchnorm': args.sync_batchnorm,
+        'enable_checkpointing': args.enable_checkpointing,
         'callbacks': callbacks
     }
+    print(f"Trainer kwargs: {trainer_kwargs}")
     return L.Trainer(**trainer_kwargs)
 
 def load_data_module(args):
@@ -227,33 +275,44 @@ def load_data_module(args):
 def train_nn_model(args, model):
     
     data_module = load_data_module(args)
-    callbacks = define_callbacks(args.callbacks)
+    callbacks = define_callbacks(args, args.callbacks)
     trainer = define_trainer(args, callbacks)
     
     print("Training with the following configuration:", args)
     trainer.fit(model, datamodule=data_module)
 
-    # TODO: Add and expand on this, to save more info> Callbacks should take care of this, but check!
-    create_dir_if_not_exists(args.save_dir)
-    trainer.save_checkpoint(os.path.join(args.save_dir, f"{args.save_name}.ckpt"))
-    # Saving last checkpoint
-    print(f"Last model saved to {args.save_dir}")
-
 def predict_nn_model(args):
     model_class = get_nn_model_class(args.model_class)
-    model = model_class.load_from_checkpoint(os.path.join(args.model_dir, f"{args.model_file}.ckpt"))
+    try:
+        print(f"Loading model from {args.model_file}.ckpt")
+        model = model_class.load_from_checkpoint(f"{args.model_file}.ckpt")
+        print(f"Loaded model")
+
+    except FileNotFoundError:
+        print(f"Loading model from {os.path.join(args.model_dir, f'{args.model_file}.ckpt')}")
+        model = model_class.load_from_checkpoint(os.path.join(args.model_dir, f"{args.model_file}.ckpt"))
+        print(f"Loaded model")
     
     data_module = load_data_module(args)
     trainer = define_trainer(args)
-    
-    predictions = trainer.predict(model, datamodule=data_module)
+
+    model.eval()
+    model.freeze()
+
+    if args.stage == "predict":
+        predictions = trainer.predict(model, datamodule=data_module)
+    elif args.stage == "test":
+        predictions = trainer.test(model, datamodule=data_module)
+    elif args.stage == "validate":
+        predictions = trainer.test(model, datamodule=data_module)
+
     save_predictions(predictions, args)
     print("Predictions complete")
 
 def save_predictions(predictions, args):
     create_dir_if_not_exists(args.save_dir)
     save_path = os.path.join(args.save_dir, f"{args.save_name}.{args.save_type}")
-    
+
     if args.save_type == 'csv':
         pd.DataFrame(predictions).to_csv(save_path, index=False)
     elif args.save_type == 'pkl':
@@ -289,29 +348,43 @@ def parse_arguments():
     nn_common_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
     nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
     nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-    nn_common_parser.add_argument("--model_class", type=str, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
-    nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
-    nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
-    nn_common_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-    nn_common_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+    nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
+    # nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+    # nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+    # nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+    # nn_common_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+    # nn_common_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+    nn_common_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
+    nn_common_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
+    nn_common_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
+    nn_common_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
+    nn_common_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
+    nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
+    nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!")
+
 
     # NN Train parser
     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
     nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
     nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
-    nn_train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-    nn_train_parser.add_argument("--save_name", type=str, default="nn_model", help="Filename for saved model")
+
+    nn_train_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+    nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+    nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+    nn_train_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
 
     # NN Predict parser
     nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
+    #nn_predict_parser.add_argument("--stage", type=str, default="predict", choices=["predict", "val", "test"], help="DataModule stage to use for prediction")
     nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-
+    nn_predict_parser.add_argument("--stage", type=str, default="predict", choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
+    
     # Scikit-learn parsers (logreg and rf)
     for model_type in ['logreg', 'rf']:
         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
@@ -360,80 +433,6 @@ def process_layers_argument(args):
         args.layers = args.layers[0]  # Convert to a single integer
     return args
 
-# def parse_arguments():
-#     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
-#     subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
-
-#     # Neural Network parser
-#     nn_parser = subparsers.add_parser('nn', help="Neural network model options")
-#     nn_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
-#     nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
-#     nn_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
-#     nn_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
-#     nn_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
-#     nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
-#     nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-#     nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
-#     nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
-#     nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
-#     nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
-#     nn_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
-#     nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
-#     nn_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-#     nn_parser.add_argument("--model_class", type=str, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
-#     nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
-#     nn_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-#     nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
-#     nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-#     nn_parser.add_argument("--layers", nargs='+', default=[1,1,1,1], help="Number of layers for ResNet_custom_layers")
-#     nn_parser.add_argument("--test_layer", type=int, default=3, help="Test layer for ResNet_custom_layers")
-
-#     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
-    
-#     nn_train_parser = nn_subparsers.add_parser("train", help="Train a neural network model")
-#     nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-#     nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
-#     nn_train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-#     nn_train_parser.add_argument("--save_name", type=str, default="model", help="Filename for saved model")
-
-#     nn_predict_parser = nn_subparsers.add_parser("predict", help="Predict using a neural network model")
-#     nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
-#     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
-#     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-#     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
-#     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-#     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-
-#     # Scikit-learn parsers
-#     for model_type in ['logreg', 'rf']:
-#         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
-#         model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
-        
-#         train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
-#         train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-#         train_parser.add_argument("--data", type=str, required=True, help="Data file")
-#         train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-#         train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-#         train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
-#         train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
-        
-#         if model_type == "logreg":
-#             train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
-        
-#         predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
-#         predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-#         predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-#         predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-#         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
-#         predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-#         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-#         predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-#         predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
-#         predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
-
-#     args = parser.parse_args()
-#     return args
-
 def get_extra_args(args):
     extra_args = {
                 'ceil_mode': args.ceil_mode,
@@ -450,12 +449,11 @@ def main():
     
     # NN Branch
     if args.model_type == "nn":
-        
-        if args.model_class in ['ResNet_custom_layers', 'BaseNNModel2']:
-            args = process_layers_argument(args)
-
         if args.command == "train":
+            if args.model_class in ['ResNet_custom_layers', 'BaseNNModel2']:
+                args = process_layers_argument(args)
             extra_args = get_extra_args(args)
+
             train_nn_model(args, model=get_nn_model(args.model_class, extra_args))
         elif args.command == "predict":
             predict_nn_model(args)

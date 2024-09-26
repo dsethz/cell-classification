@@ -109,21 +109,6 @@ class ResNet(L.LightningModule):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
-    # def forward(self, x): # Uncomment this and comment the next one to use the original forward function, without print statements
-    #     x = self.conv1(x)
-    #     x = self.bn1(x)
-    #     x = self.relu(x)
-    #     x = self.max_pool(x)
-
-    #     x = self.conv2_x(x)
-    #     x = self.conv3_x(x)
-    #     x = self.conv4_x(x)
-    #     x = self.conv5_x(x)
-
-    #     x = self.avg_pool(x)
-    #     x = x.view(x.size(0), -1)
-    #     x = self.fc(x)
-
     def forward(self, x):
         print(f"Input shape: {x.shape}")
         x = self.conv1(x)
@@ -186,21 +171,13 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
-        
-        # TODO: Fix this
-        # y_pred = y_hat.argmax(dim=1)
-
-
         # # Calculate accuracy, precision, recall
-        # acc = (x.argmax(dim=1) == y).float().mean()
-        # precision = (x.argmax(dim=1) == y).float().mean()
-        # recall = (x.argmax(dim=1) == y).float().mean()
-        
-        # values = {"val_loss": val_loss, "val_accuracy": acc, "val_precision": precision, "val_recall": recall}
+        #     # convert to probabilities
+        # y_pred_proba = torch.softmax(y_hat, dim=1)
+        # acc = self.accuracy(y_hat, y)
 
-        # # Log the validation loss
-        # self.log_dict(values, on_epoch=True,
-        #         prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+        # values = {"val_loss": val_loss, "val_accuracy": acc}
+        # self.log_dict(values, on_epoch=True, prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
 
         return val_loss
     

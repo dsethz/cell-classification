@@ -1,9 +1,9 @@
-# This will hold models that are used for testing purposes
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import lightning as L
 import pytorch_lightning as pl
+# from utils.eval.evals import MyAccuracy
 
 
 class testBlock(L.LightningModule):
@@ -28,14 +28,22 @@ class BaseNNModel(L.LightningModule):
         return x
     
 class BaseNNModel2(L.LightningModule):
-    def __init__(self, Block=testBlock, layers = 3):
+    def __init__(self, Block=testBlock, layers=3):
         super().__init__()
+        self.save_hyperparameters()
+
+        #self.accuracy=MyAccuracy()
+
         self.fc = nn.Linear(10, 10)
         self.fc2 = nn.Linear(10, 2)
         self.Block = Block
         self.layer1 = self._make_layers(layers)
 
-    def _make_layers(self,layers):
+        num_classes = 2
+        self.num_classes = num_classes
+        self.results = {}
+
+    def _make_layers(self, layers):
         blocks = []
         for _ in range(1, layers):
             blocks.append(self.Block())
@@ -43,11 +51,8 @@ class BaseNNModel2(L.LightningModule):
 
     def forward(self, x):
         x = self.fc(x)
-        print(x.shape)
         x = self.layer1(x)
-        print(x.shape)
         x = self.fc2(x)
-        print(x.shape)
         return x
 
     def training_step(self, batch, batch_idx):
@@ -68,49 +73,52 @@ class BaseNNModel2(L.LightningModule):
         x, y = batch
         y_hat = self(x)
         test_loss = F.cross_entropy(y_hat, y)
-        self.log('test_loss', test_loss)
+    
+        # Apply softmax to get probabilities
+        y_pred_proba = torch.softmax(y_hat, dim=1)
+        
+        # Get predicted class
+        y_pred_class = torch.argmax(y_hat, dim=1)
+
+        print(y_pred_class, y)
+
+        print(y_pred_proba, y)
+
+        # precision = self.precision(y_pred_class, y)
+
+
+        # values = {
+        #     "precision": precision,
+        #     "recall": recall,
+        #     }
+        
+
+        # self.log_dict(values, on_epoch=True, on_step=False, sync_dist=True) #, reduce_fx=torch.mean)
+    
         return test_loss
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        x, y = batch # As this is a dummy model, we are using data which has labels, thus we need to extract them
-        y_hat = self(x)
-        # Format the output to be a single prediction value for each sample
-        y_hat = torch.argmax(y_hat, dim=1)
-        print(f"Predictions: {y_hat}, True labels: {y}")
-        return y_hat
+        x, y = batch
+        y_hat = self(x)  # Shape: [batch_size, num_classes]
+        # # Get predicted class (for accuracy calculation)
+        y_pred_class = torch.argmax(y_hat, dim=1)
+        
+        # Return predictions
+        return y_pred_class
         
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=0.02)
     
 
-    ######
-# def get_nn_model(model_name: str, extra_args: dict = None):
-
-#     if extra_args is None:
-#         extra_args = {}
-
-#     if model_name == "BaseNNModel":
-#         model = BaseNNModel()
-#         return model
-#     elif model_name == "BaseNNModel2":
-#         if 'Block' not in extra_args or 'layers' not in extra_args:
-#             raise ValueError("BaseNNModel2 requires 'Block' and 'layers' in extra_args.")
-
-#         model = BaseNNModel2(Block=extra_args['Block'], layers=extra_args['layers'])
-
-#         return model
-
+# Function to return BaseNNModel
 def get_BaseNNModel():
-    return BaseNNModel
+    return BaseNNModel()
 
+# Function to return BaseNNModel2
 def get_BaseNNModel2(layers):
     return BaseNNModel2(layers=layers)
 
 if __name__ == '__main__':
-        extra_args = {'Block': testBlock, 'layers': 3}
-        model = get_nn_model('BaseNNModel2', extra_args=extra_args)
-        print(isinstance(model, L.LightningModule))
-
-        model = testBlock()
-        print(isinstance(model, L.LightningModule))
+    model = BaseNNModel2(layers=3)
+    print(isinstance(model, L.LightningModule))
