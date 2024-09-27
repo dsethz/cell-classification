@@ -187,15 +187,14 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
 
 def define_callbacks(args, callback_names: list):
 
-    # Making the checkpointing callback here:
-
-
     callbacks = []
     for callback_name in callback_names if callback_names is not None else []:
         if callback_name == "early_stopping":
-            callbacks.append(pl.callbacks.EarlyStopping(monitor='val_loss'))
-        elif callback_name == "model_checkpoint":
-            callbacks.append(pl.callbacks.ModelCheckpoint(monitor='val_loss'))
+            if not hasattr(args, monitor_stop):
+                args.monitor_stop = "val_loss"
+            callbacks.append(pl.callbacks.EarlyStopping(monitor=args.monitor_stop))
+        # elif callback_name == "model_checkpoint":
+        #     callbacks.append(pl.callbacks.ModelCheckpoint(monitor='val_loss'))
         elif callback_name == "lr_monitor":
             callbacks.append(pl.callbacks.LearningRateMonitor())
         elif callback_name == "BatchSizeFinder":
@@ -236,7 +235,7 @@ class FineTuneBatchSizeFinder(BatchSizeFinder):
         return
 
     def on_train_epoch_start(self, trainer, pl_module):
-        if trainer.current_epoch in [0, 1, 2]:
+        if trainer.current_epoch in [0, 1]:
             self.scale_batch_size(trainer, pl_module)
 
 def define_trainer(args, callbacks=None):
@@ -255,6 +254,7 @@ def define_trainer(args, callbacks=None):
         'log_every_n_steps': args.log_every_n_steps,
         'sync_batchnorm': args.sync_batchnorm,
         'enable_checkpointing': args.enable_checkpointing,
+        'strategy': args.strategy,
         'callbacks': callbacks
     }
     print(f"Trainer kwargs: {trainer_kwargs}")
@@ -264,7 +264,12 @@ def load_data_module(args):
     if args.data_module == "BaseDataModule":
         data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
     elif args.data_module == "CustomDataModule":
-        data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
+        if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO: This should later be able to be superseeded by providing individual directories for all files as well
+            setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
+        else:
+            setup_file = args.setup_file
+        
+        data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size)
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
@@ -345,9 +350,10 @@ def parse_arguments():
     nn_common_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
     nn_common_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
     nn_common_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
-    nn_common_parser.add_argument("--log_every_n_steps", type=int, default=5, help="Log every n steps")
+    nn_common_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
     nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
     nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+    nn_common_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule")
     nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
     # nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
     # nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
@@ -358,10 +364,11 @@ def parse_arguments():
     nn_common_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
     nn_common_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
     nn_common_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
+    nn_common_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
     nn_common_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
     nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
     nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!")
-
+    nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
 
     # NN Train parser
     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
