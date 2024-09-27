@@ -171,7 +171,7 @@ class ResNet(L.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = loss_fn(y_hat, y)
-        self.log('training_loss', loss)
+        self.log('training_loss', loss, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -180,7 +180,7 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
-        self.log('val_loss', val_loss)
+        self.log('val_loss', val_loss,sync_dist=True)
 
         # # Calculate accuracy, precision, recall
         #     # convert to probabilities
