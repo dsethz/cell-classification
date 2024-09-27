@@ -55,6 +55,7 @@ from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNMo
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
+from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 # import tensorboard
 '''
@@ -236,6 +237,7 @@ class FineTuneBatchSizeFinder(BatchSizeFinder):
 def define_trainer(args, callbacks=None):
     trainer_kwargs = {
         'profiler': args.profiler,
+        'enable_progress_bar': args.enable_progress_bar
         'max_epochs': args.max_epochs,
         'default_root_dir': args.default_root_dir,
         'devices': args.devices,
@@ -338,11 +340,12 @@ def parse_arguments():
 
     # Common NN arguments
     nn_common_parser = argparse.ArgumentParser(add_help=False)
-    nn_common_parser.add_argument("--profiler", action="store_true", help="Enable PyTorch Lightning profiler")
+    nn_common_parser.add_argument("--profiler", choices=[None,"simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler, choices are simple, advanced")
+    nn_common_parser.add_argument("--enable_progress_bar", action="store_false", help="Disables the progress bar")
     nn_common_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
     nn_common_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
-    nn_common_parser.add_argument("--devices", type=str, default="auto", help="Devices to use for training")
-    nn_common_parser.add_argument("--accelerator", type=str, default="auto", help="Accelerator to use for training")
+    nn_common_parser.add_argument("--devices", type=int, default=1, help="Devices to use for training")
+    nn_common_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Accelerator to use for training")
     nn_common_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
     nn_common_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
     nn_common_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
