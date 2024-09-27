@@ -180,6 +180,8 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
+        self.log('val_loss', val_loss)
+
         # # Calculate accuracy, precision, recall
         #     # convert to probabilities
         # y_pred_proba = torch.softmax(y_hat, dim=1)
