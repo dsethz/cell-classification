@@ -50,6 +50,7 @@ from sklearn.base import BaseEstimator
 
 from utils.testdatamodule import BaseDataModule
 from utils.datamodule import CustomDataModule
+from utils.loss_fn import create_loss_fn_with_weights, calculate_class_weights
 from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
@@ -193,9 +194,9 @@ def define_callbacks(args, callback_names: list):
             callbacks.append(pl.callbacks.LearningRateMonitor())
         elif callback_name == "BatchSizeFinder":
             callbacks.append(FineTuneBatchSizeFinder())
-    
-    checkpoint_callback = create_checkpoint_callback(args)
-    callbacks.append(checkpoint_callback)
+    if args.enable_checkpointing:
+        checkpoint_callback = create_checkpoint_callback(args)
+        callbacks.append(checkpoint_callback)
 
     return callbacks
 
@@ -271,9 +272,13 @@ def load_data_module(args):
     data_module.setup()
     return data_module
 
-def train_nn_model(args, model):
+def train_nn_model(args):
     
     data_module = load_data_module(args)
+    loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), args.loss_fn, weight=args.loss_weight)
+    extra_args = get_extra_args(args, loss_fn=loss_fn)
+    model = get_nn_model(args.model_class, extra_args)
+
     callbacks = define_callbacks(args, args.callbacks)
     trainer = define_trainer(args, callbacks)
     
@@ -363,6 +368,8 @@ def parse_arguments():
     nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
     nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!")
     nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
+    nn_common_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
+    nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
 
     # NN Train parser
     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
@@ -434,14 +441,15 @@ def process_layers_argument(args):
         args.layers = args.layers[0]  # Convert to a single integer
     return args
 
-def get_extra_args(args):
+def get_extra_args(args, loss_fn):
     extra_args = {
                 'ceil_mode': args.ceil_mode,
                 'num_classes': args.num_classes,
                 'image_channels': args.image_channels,
                 'padding_layer_sizes': args.padding_layer_sizes,
                 'layers': args.layers,
-                'padding_layer_sizes': args.padding_layer_sizes
+                'padding_layer_sizes': args.padding_layer_sizes,
+                'loss_fn': loss_fn
                 }
     return extra_args
 
@@ -453,9 +461,7 @@ def main():
         if args.command == "train":
             if args.model_class in ['ResNet_custom_layers', 'BaseNNModel2']:
                 args = process_layers_argument(args)
-            extra_args = get_extra_args(args)
-
-            train_nn_model(args, model=get_nn_model(args.model_class, extra_args))
+            train_nn_model(args)
         elif args.command == "predict":
             predict_nn_model(args)
 

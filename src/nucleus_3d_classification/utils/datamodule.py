@@ -4,13 +4,11 @@ import os
 import json
 import torch
 from torch.utils.data import DataLoader
-# import torch.nn.functional as F
 import tifffile as tiff
 from torchvision import transforms
-# import pytorch_lightning as pl
-# import torch.nn as nn
-# import matplotlib.pyplot as plt
-# import numpy as np
+
+#from utils.
+# TODO: Put utils. in front, after finishing testing
 from utils.padding import pad
 import lightning as L
 
