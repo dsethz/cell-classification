@@ -55,7 +55,7 @@ from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
 
-import tensorboard
+# import tensorboard
 '''
 NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented 
 for the MPS device. If you want this op to be added in priority during the prototype phase of this feature, 
@@ -99,16 +99,10 @@ def get_nn_model(model_name: str, extra_args: dict = None):
     if extra_args is None:
         extra_args = {}
 
-    print(f'{type(extra_args['layers'])}')
-
-    # if hasattr(extra_args, 'block'):
-    #     print(f"Block found in extra_args: {extra_args['block']},\n Block type: {type(extra_args['block'])}")
-    #     extra_args['block'] = globals()[extra_args['block']]
-
     print(f"Creating model: {model_name} with extra_args: {extra_args}")
 
     if model_name == "BaseNNModel":
-        return BaseNNModel() # TODO: Check if this is correct, do we have to get model = ...()?
+        return BaseNNModel()
     elif model_name == "BaseNNModel2":
         return BaseNNModel2(layers = extra_args['layers'])
     elif model_name in ["ResNet50", "ResNet101", "ResNet152"]:

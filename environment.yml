@@ -20,3 +20,4 @@ dependencies:
   - joblib # For parallel runs, RF.
   - lightning[pytorch-extra] # For LightningCLI
   - pandas # For data manipulation vers 2.2.2
+  - tifffile # For reading tiff files
