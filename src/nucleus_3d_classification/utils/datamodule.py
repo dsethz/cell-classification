@@ -111,8 +111,8 @@ def load_labels(label_dir):
 # LightningDataModule to handle dataset and dataloading logic
 class CustomDataModule(L.LightningDataModule):
     def __init__(self, setup_file=None, root_dir=None, crop_dir=None, label_dir=None, 
-                label_to_directory=None, target_size=[34,164,174], batch_size: int = 16,
-                num_workers=0, train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'],
+                label_to_directory=None, target_size=[34,164,174], batch_size = None,
+                num_workers = None, train_image_names='Hoxb5', val_image_names=['c0_0-68_1000', 'c0_0-68_950'],
                 test_image_names='c0_0-55'): # TODO: # Change the default to None later ?
         super().__init__()
         self.root_dir = root_dir # root dir is useless here rn TODO: Remove?
@@ -156,12 +156,12 @@ class CustomDataModule(L.LightningDataModule):
                 self.crop_dir = setup_info['crop_dir']
                 self.label_dir = setup_info['label_dir']
                 self.target_size = setup_info['target_size']
-                self.batch_size = setup_info['batch_size']
+                self.batch_size = setup_info['batch_size'] if self.batch_size is None else self.batch_size
                 self.train_image_names = setup_info['train_image_names']
                 self.val_image_names = setup_info['val_image_names']
                 self.test_image_names = setup_info['test_image_names']
                 self.label_to_directory = setup_info['label_to_directory']
-                self.num_workers = setup_info['num_workers'] 
+                self.num_workers = setup_info['num_workers']  if self.num_workers is None else self.num_workers
 
         # Load label files with error handling
         labels_dict = load_labels(self.label_dir)

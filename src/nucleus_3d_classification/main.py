@@ -55,6 +55,7 @@ from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNMo
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
+from lightning.pytorch.callbacks import LearningRateFinder
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 # import tensorboard
@@ -195,11 +196,36 @@ def define_callbacks(args, callback_names: list):
             callbacks.append(pl.callbacks.LearningRateMonitor())
         elif callback_name == "BatchSizeFinder":
             callbacks.append(FineTuneBatchSizeFinder())
+        elif callback_name == "LearningRateFinder":
+            if not hasattr(args, 'milestones') or hasattr(args, 'milestones') and args.milestones is None:
+                milestones = [0, 1]
+            else:
+                try:
+                    milestones = [int(m) for m in args.milestones] if isinstance(args.milestones, list) else [int(args.milestones)]
+                except ValueError:
+                    print("Milestones must be integers, using default milestones of 0 and 1")
+                    milestones = [0, 1]
+            callbacks.append(FineTuneLearningRateFinder(milestones=milestones))
+        elif callback_name == "StochasticWeightAveraging":
+            print("Adding StochasticWeightAveraging callback, using SWA learning rate of 1e-4")
+            callbacks.append(pl.callbacks.StochasticWeightAveraging(swa_lrs=1e-4))
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback)
 
     return callbacks
+
+class FineTuneLearningRateFinder(LearningRateFinder):
+    def __init__(self, milestones=0, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.milestones = milestones
+
+    def on_fit_start(self, *args, **kwargs):
+        return
+
+    def on_train_epoch_start(self, trainer, pl_module):
+        if trainer.current_epoch in self.milestones or trainer.current_epoch == 0:
+            self.lr_find(trainer, pl_module)
 
 def create_checkpoint_callback(args):
     args.filename = replace_filename(args)
@@ -259,14 +285,17 @@ def define_trainer(args, callbacks=None):
 
 def load_data_module(args):
     if args.data_module == "BaseDataModule":
-        data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
+        if not hasattr(args, 'batch_size') or hasattr(args, 'batch_size') and args.batch_size is None:
+            print("No batch size provided, using default batch size of 32")
+            data_module = BaseDataModule(data_dir="./data", batch_size=32)
+        else:
+            data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
     elif args.data_module == "CustomDataModule":
         if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO: This should later be able to be superseeded by providing individual directories for all files as well
             setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
         else:
             setup_file = args.setup_file
-        
-        data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size)
+        data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size, num_workers=args.num_workers)
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
@@ -283,7 +312,7 @@ def train_nn_model(args):
 
     callbacks = define_callbacks(args, args.callbacks)
     trainer = define_trainer(args, callbacks)
-    
+
     print("Training with the following configuration:", args)
     trainer.fit(model, datamodule=data_module)
 
@@ -373,11 +402,13 @@ def parse_arguments():
     nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
     nn_common_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
+    nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
+    nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
 
     # NN Train parser
     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
     nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-    nn_train_parser.add_argument("--batch_size", type=int, default=32, help="Batch size for training")
+    # nn_train_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for training")
 
     nn_train_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
     nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
