@@ -55,7 +55,7 @@ from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNMo
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
-from lightning.pytorch.callbacks import LearningRateFinder
+from lightning.pytorch.callbacks import LearningRateFinder, StochasticWeightAveraging
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 # import tensorboard
@@ -208,7 +208,7 @@ def define_callbacks(args, callback_names: list):
             callbacks.append(FineTuneLearningRateFinder(milestones=milestones))
         elif callback_name == "StochasticWeightAveraging":
             print("Adding StochasticWeightAveraging callback, using SWA learning rate of 1e-4")
-            callbacks.append(pl.callbacks.StochasticWeightAveraging(swa_lrs=1e-4))
+            callbacks.append(StochasticWeightAveraging(swa_lrs=1e-4))
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback)
@@ -235,6 +235,8 @@ def create_checkpoint_callback(args):
 
     return ModelCheckpoint(
         save_top_k=args.save_top_k,
+        save_last=True,
+        save_on_train_epoch_end=True,
         monitor=args.monitor,
         mode=args.mode,
         dirpath=args.dirpath,
@@ -285,7 +287,7 @@ def define_trainer(args, callbacks=None):
 
 def load_data_module(args):
     if args.data_module == "BaseDataModule":
-        if not hasattr(args, 'batch_size') or hasattr(args, 'batch_size') and args.batch_size is None:
+        if not hasattr(args, 'batch_size') or (hasattr(args, 'batch_size') and args.batch_size is None):
             print("No batch size provided, using default batch size of 32")
             data_module = BaseDataModule(data_dir="./data", batch_size=32)
         else:
@@ -295,7 +297,7 @@ def load_data_module(args):
             setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
         else:
             setup_file = args.setup_file
-        data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size, num_workers=args.num_workers)
+        data_module = CustomDataModule(setup_file=setup_file, batch_size=int(args.batch_size), num_workers=args.num_workers)
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
@@ -419,7 +421,7 @@ def parse_arguments():
     # NN Predict parser
     nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
     #nn_predict_parser.add_argument("--stage", type=str, default="predict", choices=["predict", "val", "test"], help="DataModule stage to use for prediction")
-    nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
+    # nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
