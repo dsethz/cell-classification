@@ -445,7 +445,21 @@ def load_data_module(args):
             setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
         else:
             setup_file = args.setup_file
-        data_module = CustomDataModule(setup_file=setup_file, batch_size=int(args.batch_size), num_workers=args.num_workers)
+
+        if args.batch_size is not None:
+            try:
+                args.batch_size = int(args.batch_size)
+            except ValueError:
+                print(f"Error converting batch_size to integer: {args.batch_size}, using default value of None")
+                args.batch_size = None
+        if args.num_workers is not None:
+            try:
+                args.num_workers = int(args.num_workers)
+            except ValueError:
+                print(f"Error converting num_workers to integer: {args.num_workers}, using default value of None")
+                args.num_workers = None
+
+        data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size, num_workers=args.num_workers)
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
