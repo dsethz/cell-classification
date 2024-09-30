@@ -448,6 +448,7 @@ def define_trainer(args, callbacks=None):
         'sync_batchnorm': args.sync_batchnorm,
         'enable_checkpointing': args.enable_checkpointing,
         'strategy': args.strategy,
+        'gradient_clip_val': args.gradient_clip_val,
         'callbacks': callbacks
     }
     print(f"Trainer kwargs: {trainer_kwargs}")
@@ -502,16 +503,28 @@ def train_nn_model(args):
 
 def predict_nn_model(args):
     model_class = get_nn_model_class(args.model_class)
-    try:
-        print(f"Loading model from {args.model_file}.ckpt")
-        model = model_class
-        model = model.load_from_checkpoint(f"{args.model_file}.ckpt")
-        print(f"Loaded model")
 
-    except FileNotFoundError:
-        print(f"Loading model from {os.path.join(args.model_dir, f'{args.model_file}.ckpt')}")
-        model = model_class.load_from_checkpoint(os.path.join(args.model_dir, f"{args.model_file}.ckpt"))
-        print(f"Loaded model")
+    # Define possible paths and file names to attempt loading
+    model_paths = [
+        f"{args.model_file}",
+        f"{args.model_file}.ckpt",
+        os.path.join(args.model_dir, f"{args.model_file}"),
+        os.path.join(args.model_dir, f"{args.model_file}.ckpt")
+    ]
+    
+    # Attempt to load the model from each path
+    for model_path in model_paths:
+        try:
+            print(f"Attempting to load model from {model_path}")
+            model = model_class.load_from_checkpoint(model_path)
+            print(f"Successfully loaded model from {model_path}")
+            return model
+        except FileNotFoundError:
+            print(f"Model file not found at {model_path}, trying next option...")
+    
+    # If none of the paths worked, raise an error
+    raise FileNotFoundError(f"Model file not found. Tried the following paths: {model_paths}")
+
     
     data_module = load_data_module(args)
     trainer = define_trainer(args)
@@ -520,7 +533,7 @@ def predict_nn_model(args):
     model.freeze()
 
     if args.stage == "predict":
-        predictions = trainer.predict(model, datamodule=data_module) # TODO: Not implemented yet.
+        predictions = trainer.predict(model, datamodule=data_module) # TODO: Not implemented yet for custom datamodule.
     elif args.stage == "test":
         predictions = trainer.test(model, datamodule=data_module)
     elif args.stage == "validate":
@@ -589,6 +602,7 @@ def parse_arguments():
     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
     nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
     nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
+    nn_common_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
 
     nn_common_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
     nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
