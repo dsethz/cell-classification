@@ -231,6 +231,11 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
     return y
 
 def extract_arguments(text):
+
+    if isinstance(text, list):
+        # Join the list into a single string
+        text = " ".join(text)
+
     # Regular expression to match key=value pairs
     pattern = r"(\w+)=([0-9e\-.]+|\w+|\[[0-9, ]+\])"
     matches = re.findall(pattern, text)
@@ -692,3 +697,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# /opt/miniconda3/envs/napari_image/bin/python /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/main.py nn train --model_class ResNet_custom_layers --callbacks BatchSizeFinder LearningRateFinder StochasticWeightAveraging --loss_weight balanced --enable_checkpointing --save_top_k 2 --default_root_dir /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --dirpath /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --max_epochs 5 --swa_args annealing_epochs=2 swa_lrs=1e-3 swa_epoch_start=2  --data_module CustomDataModule --layers 1 1 1 1
