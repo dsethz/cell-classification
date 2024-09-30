@@ -232,6 +232,12 @@ class ResNet(L.LightningModule):
         self.log('test_precision', precision, on_epoch=True, sync_dist=True)
         self.log('test_recall', recall, on_epoch=True, sync_dist=True)
         self.log('test_f1_score', f1_score, on_epoch=True, sync_dist=True)
+        
+        self.log('tp', self.tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fp', self.fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('tn', self.tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fn', self.fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('total', total, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
 
         # Print for debugging
         print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
