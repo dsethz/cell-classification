@@ -417,7 +417,18 @@ def replace_filename(args):
     filename = filename.replace("data_module_name", args.data_module)
     filename = filename.replace("epoch", "{epoch:02d}")
     filename = filename.replace("val_loss", "{val_loss:.2f}")
+
+    filename = clean_filename(filename)
+    
     return filename
+
+def clean_filename(filename):
+    # Set of special characters to be replaced with an underscore
+    special_chars = {'/', '\\', ':', '*', '?', '"', '<', '>', '|', "'", '!', '@', '#', '$', '%', '^', '&', '(', ')', '+', '=', '{', '}', '[', ']', ';', ',', '.', '`', '~', ' '}
+    
+    # Use regex to replace all special characters in the set with an underscore
+    return re.sub(r'[{}]'.format(re.escape(''.join(special_chars))), '_', filename)
+
 
 class FineTuneBatchSizeFinder(BatchSizeFinder):
     def __init__(self, *args, **kwargs):
@@ -520,7 +531,7 @@ def predict_nn_model(args):
             print(f"Attempting to load model from {model_path}")
             model = model_class.load_from_checkpoint(model_path)
             print(f"Successfully loaded model from {model_path}")
-            return model
+            break
         except FileNotFoundError:
             print(f"Model file not found at {model_path}, trying next option...")
     
@@ -536,6 +547,7 @@ def predict_nn_model(args):
     model.freeze()
 
     if args.stage == "predict":
+        print("Predicting - this is not implemented yet for CustomDataModule!")
         predictions = trainer.predict(model, datamodule=data_module) # TODO: Not implemented yet for custom datamodule.
     elif args.stage == "test":
         predictions = trainer.test(model, datamodule=data_module)
