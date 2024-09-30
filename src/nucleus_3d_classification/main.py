@@ -58,7 +58,7 @@ For NN models, the following options are available:
     - --data_module: Data module to use (BaseDataModule (testing purposes), CustomDataModule (for custom data loading))
     - --setup_file: Setup file for CustomDataModule
     - --profiler: Enable PyTorch Lightning profiler, choices are simple, advanced
-    - --enable_progress_bar: Disables the progress bar
+    - --enable_progress_bar: Enables the progress bar
     - --max_epochs: Max epochs for training
     - --default_root_dir: Default root directory for logs
     - --devices: Devices to use for training, expects int, default is auto
@@ -175,7 +175,21 @@ def get_nn_model(model_name: str, extra_args: dict = None):
 def get_nn_model_class(model_name: str):
     if model_name not in globals():
         raise ValueError(f"Model class {model_name} not found, or input is not valid.\nPlease use one of the following: {list(globals().keys())}") # TODO: Check if this is correct
-    return globals()[model_name]
+    # Return Class object, not instance
+    model = globals()[model_name]
+
+    # For some imports we have functions, not classes, thus we need to call the models in order to get the class object
+    if callable(model) and model_name in ["ResNet50", "ResNet_custom_layers", "ResNet101", "ResNet152"]:
+        try:
+            model = model()
+        except TypeError:
+            num_classes = 2
+            padding_layer_sizes = (2, 2, 4, 3, 7, 7)
+            ceil_mode = True
+            model = model(num_classes=num_classes, image_channels=image_channels, padding_layer_sizes=padding_layer_sizes, ceil_mode=ceil_mode)
+        return model.__class__
+    
+    return model
 
 def load_data(data_dir: str, data_file: str, target: str = 'label'):
     data_path = os.path.join(data_dir, data_file)
@@ -489,7 +503,8 @@ def predict_nn_model(args):
     model_class = get_nn_model_class(args.model_class)
     try:
         print(f"Loading model from {args.model_file}.ckpt")
-        model = model_class.load_from_checkpoint(f"{args.model_file}.ckpt")
+        model = model_class
+        model = model.load_from_checkpoint(f"{args.model_file}.ckpt")
         print(f"Loaded model")
 
     except FileNotFoundError:
@@ -504,7 +519,7 @@ def predict_nn_model(args):
     model.freeze()
 
     if args.stage == "predict":
-        predictions = trainer.predict(model, datamodule=data_module)
+        predictions = trainer.predict(model, datamodule=data_module) # TODO: Not implemented yet.
     elif args.stage == "test":
         predictions = trainer.test(model, datamodule=data_module)
     elif args.stage == "validate":
@@ -539,7 +554,7 @@ def parse_arguments():
     # Common NN arguments
     nn_common_parser = argparse.ArgumentParser(add_help=False)
     nn_common_parser.add_argument("--profiler", choices=[None,"simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler, choices are simple, advanced")
-    nn_common_parser.add_argument("--enable_progress_bar", action="store_false", help="Disables the progress bar")
+    nn_common_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
     nn_common_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
     nn_common_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
     nn_common_parser.add_argument("--devices", default='auto', help="Devices to use for training, expects int, default is auto")
@@ -698,4 +713,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# /opt/miniconda3/envs/napari_image/bin/python /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/main.py nn train --model_class ResNet_custom_layers --callbacks BatchSizeFinder LearningRateFinder StochasticWeightAveraging --loss_weight balanced --enable_checkpointing --save_top_k 2 --default_root_dir /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --dirpath /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --max_epochs 5 --swa_args annealing_epochs=2 swa_lrs=1e-3 swa_epoch_start=2  --data_module CustomDataModule --layers 1 1 1 1
+# nn train --model_class ResNet_custom_layers --enable_progress_bar --callbacks BatchSizeFinder LearningRateFinder StochasticWeightAveraging --loss_weight balanced --enable_checkpointing --save_top_k 2 --default_root_dir /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --dirpath /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --max_epochs 5 --swa_args annealing_epochs=2 swa_lrs=1e-3 swa_epoch_start=2  --data_module CustomDataModule --layers 1 0 0 0

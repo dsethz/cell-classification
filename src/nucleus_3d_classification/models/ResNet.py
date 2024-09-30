@@ -49,7 +49,7 @@ class ResNet(L.LightningModule):
     def __init__(self, layers, num_classes, block=Block,
                 image_channels=1, ceil_mode=False,
                 zero_init_resudual: bool = False, # TODO: Check if we can implement this
-                padding_layer_sizes=None, learning_rate=1e-3,
+                padding_layer_sizes=None, learning_rate=1e-5,
                 loss_fn = 'cross_entropy'):
         super(ResNet, self).__init__()
         '''

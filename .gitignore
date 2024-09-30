@@ -93,3 +93,4 @@ src/nucleus_3d_classification/models/model.pkl
 /lightning_logs
 src/nucleus_3d_classification/test.ipynb
 /logs
+/src/nucleus_3d_classification/logs/lightning_logs

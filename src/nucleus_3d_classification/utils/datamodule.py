@@ -67,7 +67,7 @@ def match_labels_to_images(labels_dict, crop_dir, label_to_directory_file):
             if not os.path.exists(image_path):
                 print(f"Warning: Image directory {image_path} does not exist.")
             else:
-                print(f"Matched label file {label_file} with directory {matched_directory}.")
+                #print(f"Matched label file {label_file} with directory {matched_directory}.")
                 label_to_directory[label_file] = matched_directory
         else:
             print(f"Warning: No matching directory found for label file {label_file}.")
