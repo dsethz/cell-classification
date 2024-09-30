@@ -32,6 +32,44 @@ Examples:
 For more detailed information on available options for each model type and command,
 use the --help flag:
     python script_name.py <model_type> <command> --help
+
+For NN models, the following options are available:
+    - --model_class: Model class to use (ResNet50, ResNet101, ResNet152, ResNet_custom_layers, BaseNNModel, BaseNNModel2)
+    - --num_classes: Number of classes to predict (ResNet)
+    - --image_channels: Image channels (ResNet)
+    - --padding_layer_sizes: Padding layers for ResNet
+    - --ceil_mode: Ceil mode for ResNet on the maxpool layer
+    - --layers: Number of layers for custom models or ResNet_custom_layers
+    - --sync_batchnorm: Synchronize batch normalization layers
+    - --enable_checkpointing: Enable model checkpointing
+    - --save_top_k: Save top k models
+    - --monitor: Monitor metric for model checkpointing
+    - --monitor_stop: Monitor metric for early stopping
+    - --mode: Mode for model checkpointing ('min' or 'max')
+    - --dirpath: Directory to save models using checkpointing
+    - --filename: Filename for saved models
+    - --strategy: Training strategy (ddp, ddp_spawn, deepspeed, etc.)
+    - --loss_fn: Loss function to use (cross_entropy, bce, mse)
+    - --loss_weight: Class weight for classification
+    - --num_workers: Number of workers for dataloader
+    - --batch_size: Batch size for dataloader
+    - --swa_args: StochasticWeightAveraging arguments, example: --swa_args swa_lrs=3e-4 swa_epoch_start=15 annealing_epochs=10 annealing_strategy=cos
+    - --callbacks: Callbacks to use: (early_stopping, model_checkpoint, lr_monitor), example: --callbacks early_stopping model_checkpoint lr_monitor
+    - --data_module: Data module to use (BaseDataModule (testing purposes), CustomDataModule (for custom data loading))
+    - --setup_file: Setup file for CustomDataModule
+    - --profiler: Enable PyTorch Lightning profiler, choices are simple, advanced
+    - --enable_progress_bar: Disables the progress bar
+    - --max_epochs: Max epochs for training
+    - --default_root_dir: Default root directory for logs
+    - --devices: Devices to use for training, expects int, default is auto
+    - --accelerator: Accelerator to use for training
+    - --accumulate_grad_batches: Accumulate gradient batches
+    - --fast_dev_run: Run a fast development run
+    - --limit_train_batches: Limit train batches
+    - --limit_val_batches: Limit validation batches
+    - --limit_test_batches: Limit test batches
+    - --limit_predict_batches: Limit predict batches
+    - --log_every_n_steps: Log every n steps
 """
 
 import os
@@ -206,9 +244,65 @@ def define_callbacks(args, callback_names: list):
                     print("Milestones must be integers, using default milestones of 0 and 1")
                     milestones = [0, 1]
             callbacks.append(FineTuneLearningRateFinder(milestones=milestones))
+
         elif callback_name == "StochasticWeightAveraging":
-            print("Adding StochasticWeightAveraging callback, using SWA learning rate of 1e-4")
-            callbacks.append(StochasticWeightAveraging(swa_lrs=1e-4))
+            print("Adding StochasticWeightAveraging callback")
+
+            # Check if checkpointing is enabled
+            if not args.enable_checkpointing:
+                print("Warning: StochasticWeightAveraging requires model checkpointing to be enabled. Disabling SWA.")
+            else:
+                # Initialize default values for SWA parameters
+                default_swa_lrs = 1e-4
+                default_swa_epoch_start = 10
+                default_annealing_epochs = 10
+                default_annealing_strategy = 'cos'
+
+                # Check if swa_args are passed
+                if args.swa_args is not None:
+                    try:
+                        # Parse swa_args with default fallback values
+                        swa_lrs = [float(arg.split('=')[1]) for arg in args.swa_args if 'swa_lrs' in arg]
+                        swa_lrs = swa_lrs[0] if swa_lrs else default_swa_lrs
+
+                        swa_epoch_start = [int(arg.split('=')[1]) for arg in args.swa_args if 'swa_epoch_start' in arg]
+                        swa_epoch_start = swa_epoch_start[0] if swa_epoch_start else default_swa_epoch_start
+
+                        annealing_epochs = [int(arg.split('=')[1]) for arg in args.swa_args if 'annealing_epochs' in arg]
+                        annealing_epochs = annealing_epochs[0] if annealing_epochs else default_annealing_epochs
+
+                        annealing_strategy = [arg.split('=')[1] for arg in args.swa_args if 'annealing_strategy' in arg]
+                        annealing_strategy = annealing_strategy[0] if annealing_strategy else default_annealing_strategy
+
+                    except (ValueError, IndexError) as e:
+                        print(f"Error parsing swa_args: {e}. Using default SWA parameters.")
+                        swa_lrs = default_swa_lrs
+                        swa_epoch_start = default_swa_epoch_start
+                        annealing_epochs = default_annealing_epochs
+                        annealing_strategy = default_annealing_strategy
+                else:
+                    # If no swa_args, use default SWA parameters
+                    print("No SWA arguments provided. Using default values.")
+                    swa_lrs = default_swa_lrs
+                    swa_epoch_start = default_swa_epoch_start
+                    annealing_epochs = default_annealing_epochs
+                    annealing_strategy = default_annealing_strategy
+
+                # Log the chosen SWA parameters
+                print(f"Using SWA parameters: "
+                      f"swa_lrs={swa_lrs}, "
+                      f"swa_epoch_start={swa_epoch_start}, "
+                      f"annealing_epochs={annealing_epochs}, "
+                      f"annealing_strategy={annealing_strategy}")
+
+                # Append the SWA callback with the parsed (or default) parameters
+                callbacks.append(StochasticWeightAveraging(
+                    swa_lrs=swa_lrs, 
+                    swa_epoch_start=swa_epoch_start, 
+                    annealing_epochs=annealing_epochs, 
+                    annealing_strategy=annealing_strategy
+                ))
+
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback)
@@ -406,6 +500,7 @@ def parse_arguments():
     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
     nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
     nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
+    nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
 
     # NN Train parser
     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")

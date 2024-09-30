@@ -1,5 +1,3 @@
-# Description: This file contains the padding class that is used to pad the input image to the target size
-## MOVED TO TRANSFORM.PY
 import torch.nn.functional as F
 
 class pad:
@@ -26,4 +24,25 @@ class pad:
         # img = F.resize(img, self.target)
 
         img = F.pad(img, padding)
+        return img
+
+class scale:
+    def __init__(self, min_val, max_val):
+        self.min_val = min_val
+        self.max_val = max_val
+
+    def __call__(self, img):
+        img = (img - img.min()) / (img.max() - img.min())
+        img = img * (self.max_val - self.min_val) + self.min_val
+        return img
+    
+# Custom transformation to normalize the image intensities
+
+class normalize:
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, img):
+        img = (img - self.mean) / self.std
         return img

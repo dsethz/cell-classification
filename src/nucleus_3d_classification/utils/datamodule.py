@@ -9,7 +9,8 @@ from torchvision import transforms
 
 #from utils.
 # TODO: Put utils. in front, after finishing testing
-from utils.padding import pad
+# from utils.padding import pad
+from utils.transform import scale, normalize, pad
 import lightning as L
 
 def match_labels_to_images(labels_dict, crop_dir, label_to_directory_file):
@@ -129,7 +130,9 @@ class CustomDataModule(L.LightningDataModule):
         self.test_image_names = test_image_names
 
         self.transform = transforms.Compose([
-            pad(self.target_size)
+            pad(self.target_size),
+            scale(0, 1),
+            normalize(0.5, 0.5)
         ])
 
         self.intensities = {}
