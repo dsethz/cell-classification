@@ -512,6 +512,8 @@ def predict_nn_model(args):
         os.path.join(args.model_dir, f"{args.model_file}.ckpt")
     ]
     
+    model = None
+
     # Attempt to load the model from each path
     for model_path in model_paths:
         try:
@@ -523,7 +525,8 @@ def predict_nn_model(args):
             print(f"Model file not found at {model_path}, trying next option...")
     
     # If none of the paths worked, raise an error
-    raise FileNotFoundError(f"Model file not found. Tried the following paths: {model_paths}")
+    if model is None:
+        raise FileNotFoundError(f"Model file not found. Tried the following paths: {model_paths}")
 
     
     data_module = load_data_module(args)
