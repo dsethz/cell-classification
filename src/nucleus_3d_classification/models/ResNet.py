@@ -3,6 +3,7 @@ import torch
 import lightning as L
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.optim import lr_scheduler
 
 class Block(nn.Module):
     '''
@@ -50,7 +51,7 @@ class ResNet(L.LightningModule):
                 image_channels=1, ceil_mode=False,
                 zero_init_resudual: bool = False, # TODO: Check if we can implement this
                 padding_layer_sizes=None, learning_rate=1e-5,
-                loss_fn = 'cross_entropy'):
+                loss_fn = 'cross_entropy', scheduler_type=None, step_size=10, gamma=0.9):
         super(ResNet, self).__init__()
         '''
         This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
@@ -67,6 +68,10 @@ class ResNet(L.LightningModule):
         self.padding_layer_sizes = padding_layer_sizes
         self.learning_rate = learning_rate
         self.ceil_mode = ceil_mode
+        
+        self.scheduler_type = scheduler_type
+        self.step_size = step_size
+        self.gamma = gamma
 
         # Initialize TP, FP, TN, FN counters
         self.tp = 0
@@ -232,7 +237,7 @@ class ResNet(L.LightningModule):
         self.log('test_precision', precision, on_epoch=True, sync_dist=True)
         self.log('test_recall', recall, on_epoch=True, sync_dist=True)
         self.log('test_f1_score', f1_score, on_epoch=True, sync_dist=True)
-        
+
         self.log('tp', self.tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
         self.log('fp', self.fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
         self.log('tn', self.tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
@@ -248,10 +253,31 @@ class ResNet(L.LightningModule):
         x = self.forward(x)
         return x
     
-    def configure_optimizers(self):
-        return optim.Adam(self.parameters(), lr=self.learning_rate)
-        # Adam.self.parameters() is used to optimize the model, we can input these parameters: 
-        # lr, betas, eps, weight_decay, amsgrad, etc.
+    def configure_optimizers(self): # TODO: Implement scheduler
+        optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        if self.scheduler_type is None:
+            return optimizer
+        else:
+            # Initialize the learning rate scheduler based on the specified type
+            if self.scheduler_type == 'StepLR':
+                scheduler = lr_scheduler.StepLR(optimizer, step_size=self.step_size, gamma=self.gamma)
+            elif self.scheduler_type == 'ReduceLROnPlateau':
+                scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=10, verbose=True)
+            elif self.scheduler_type == 'ExponentialLR':
+                scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+            else:
+                print(f"Unknown scheduler type: {self.scheduler_type}")
+                print(f"Using default optimizer: Adam with lr={self.learning_rate}")
+                return optimizer
+
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'interval': 'epoch',  # or 'step', depending on the scheduler
+                'frequency': 1,       # How often to call the scheduler (every epoch or every step)
+            },
+        }
 
     
 

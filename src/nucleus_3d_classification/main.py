@@ -161,7 +161,8 @@ def get_nn_model(model_name: str, extra_args: dict = None):
             ceil_mode=extra_args['ceil_mode'],
             num_classes=extra_args['num_classes'],
             image_channels=extra_args['image_channels'],
-            padding_layer_sizes=extra_args['padding_layer_sizes']
+            padding_layer_sizes=extra_args['padding_layer_sizes'],
+            learning_rate=extra_args['learning_rate']
         )
     elif model_name == "ResNet_custom_layers":
         return ResNet_custom_layers(
@@ -169,7 +170,8 @@ def get_nn_model(model_name: str, extra_args: dict = None):
             ceil_mode=extra_args['ceil_mode'],
             num_classes=extra_args['num_classes'],
             image_channels=extra_args['image_channels'],
-            padding_layer_sizes=extra_args['padding_layer_sizes']
+            padding_layer_sizes=extra_args['padding_layer_sizes'],
+            learning_rate=extra_args['learning_rate']
         )
 
 def get_nn_model_class(model_name: str):
@@ -387,6 +389,10 @@ class FineTuneLearningRateFinder(LearningRateFinder):
         self.max_lr = max_lr
         self.num_training_steps = num_training_steps
         self.mode = mode
+
+        # Convert int to list if only one milestone is provided
+        if isinstance(self.milestones, int):
+            self.milestones = [self.milestones]
 
     def on_fit_start(self, *args, **kwargs):
         return
@@ -618,6 +624,7 @@ def parse_arguments():
     nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
     nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
     nn_common_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
+    nn_common_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
 
     nn_common_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
     nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
@@ -635,8 +642,6 @@ def parse_arguments():
 
     # NN Predict parser
     nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
-    #nn_predict_parser.add_argument("--stage", type=str, default="predict", choices=["predict", "val", "test"], help="DataModule stage to use for prediction")
-    # nn_predict_parser.add_argument("--batch_size", type=int, default=1, help="Batch size for prediction")
     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
@@ -700,7 +705,8 @@ def get_extra_args(args, loss_fn):
                 'padding_layer_sizes': args.padding_layer_sizes,
                 'layers': args.layers,
                 'padding_layer_sizes': args.padding_layer_sizes,
-                'loss_fn': loss_fn
+                'loss_fn': loss_fn,
+                'learning_rate': args.learning_rate
                 }
     return extra_args
 
