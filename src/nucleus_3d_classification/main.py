@@ -184,6 +184,7 @@ def get_nn_model_class(model_name: str):
             model = model()
         except TypeError:
             num_classes = 2
+            image_channels = 1
             padding_layer_sizes = (2, 2, 4, 3, 7, 7)
             ceil_mode = True
             model = model(num_classes=num_classes, image_channels=image_channels, padding_layer_sizes=padding_layer_sizes, ceil_mode=ceil_mode)
