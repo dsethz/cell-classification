@@ -70,11 +70,21 @@ For NN models, the following options are available:
     - --limit_test_batches: Limit test batches
     - --limit_predict_batches: Limit predict batches
     - --log_every_n_steps: Log every n steps
+
+
+# SWA args (--swa_args) example:
+--swa_args swa_lrs=3e-4 swa_epoch_start=15 annealing_epochs=10 annealing_strategy=cos
+--swa_args swa_lrs=float swa_epoch_start=int annealing_epochs=int annealing_strategy=str
+
+# LRF args (--lrf_args) example:    
+--lrf_args min_lr=1e-6 max_lr=1e-1 num_training_steps=100 mode=cos milestones=[0, 1]
+--lrf_args min_lr=float max_lr=float num_training_steps=int mode=str milestones=[int, int, int]
 """
 
 import os
 import sys
 import argparse
+import re
 import pickle
 import pandas as pd
 from typing import Optional
@@ -220,6 +230,40 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
     
     return y
 
+def extract_arguments(text):
+    # Regular expression to match key=value pairs
+    pattern = r"(\w+)=([0-9e\-.]+|\w+|\[[0-9, ]+\])"
+    matches = re.findall(pattern, text)
+    
+    # Convert matches to a dictionary
+    arguments = {key: value for key, value in matches}
+    
+    return arguments
+
+def convert_types(arguments):
+    for key, value in arguments.items():
+        if value.startswith('[') and value.endswith(']'):
+            # Convert string list to actual list
+            try:
+                arguments[key] = list(map(int, value[1:-1].split(','))) 
+                # Convert to list of integers, assuming all values are integers, otherwise print error
+            except ValueError:
+                print(f"Error converting {key} to list of integers, with values: {value}")
+        elif 'e' in value or '.' in value:
+            # Convert to float
+            try:
+                arguments[key] = float(value)
+            except ValueError:
+                pass
+                    # Keep it as a string if conversion fails, exaple 'linear', has e in it
+        else:
+            # Convert to int if it's an integer
+            try:
+                arguments[key] = int(value)
+            except ValueError:
+                pass  # Keep it as a string if conversion fails, example 'linear', as it is not an integer
+    return arguments
+
 def define_callbacks(args, callback_names: list):
 
     callbacks = []
@@ -234,16 +278,45 @@ def define_callbacks(args, callback_names: list):
             callbacks.append(pl.callbacks.LearningRateMonitor())
         elif callback_name == "BatchSizeFinder":
             callbacks.append(FineTuneBatchSizeFinder())
+
         elif callback_name == "LearningRateFinder":
-            if not hasattr(args, 'milestones') or hasattr(args, 'milestones') and args.milestones is None:
-                milestones = [0, 1]
-            else:
+            print("Adding LearningRateFinder callback")
+
+            if args.lrf_args is not None:
                 try:
-                    milestones = [int(m) for m in args.milestones] if isinstance(args.milestones, list) else [int(args.milestones)]
-                except ValueError:
-                    print("Milestones must be integers, using default milestones of 0 and 1")
+                    args.lrf_args = convert_types(extract_arguments(args.lrf_args))
+                    min_lr = args.lrf_args.get('min_lr', 1e-6)
+                    max_lr = args.lrf_args.get('max_lr', 0.1)
+                    num_training_steps = args.lrf_args.get('num_training_steps', 100)
+                    mode = args.lrf_args.get('mode', 'cos')
+                    milestones = args.lrf_args.get('milestones', [0, 1])
+
+
+                except (ValueError, IndexError) as e:
+                    print(f"Error parsing lrf_args: {e}.")
+                    min_lr = 1e-6
+                    max_lr = 1e-1
+                    num_training_steps = 100
+                    mode = 'cos'
                     milestones = [0, 1]
-            callbacks.append(FineTuneLearningRateFinder(milestones=milestones))
+            else:
+                # If no lrf_args, use default LRF parameters
+                print("LNo LRF arguments provided.")
+                min_lr = 1e-6
+                max_lr = 1e-1
+                num_training_steps = 100
+                mode = 'cos'
+                milestones = [0, 1]
+            
+            print(f"Using LRF parameters: "
+                    f"min_lr={min_lr}, "
+                    f"max_lr={max_lr}, "
+                    f"num_training_steps={num_training_steps}, "
+                    f"mode={mode}, "
+                    f"milestones={milestones}")
+
+            callbacks.append(FineTuneLearningRateFinder(min_lr=min_lr, max_lr=max_lr, num_training_steps=num_training_steps, mode=mode, milestones=milestones))
+
 
         elif callback_name == "StochasticWeightAveraging":
             print("Adding StochasticWeightAveraging callback")
@@ -252,49 +325,26 @@ def define_callbacks(args, callback_names: list):
             if not args.enable_checkpointing:
                 print("Warning: StochasticWeightAveraging requires model checkpointing to be enabled. Disabling SWA.")
             else:
-                # Initialize default values for SWA parameters
-                default_swa_lrs = 1e-4
-                default_swa_epoch_start = 10
-                default_annealing_epochs = 10
-                default_annealing_strategy = 'cos'
-
-                # Check if swa_args are passed
-                if args.swa_args is not None:
-                    try:
-                        # Parse swa_args with default fallback values
-                        swa_lrs = [float(arg.split('=')[1]) for arg in args.swa_args if 'swa_lrs' in arg]
-                        swa_lrs = swa_lrs[0] if swa_lrs else default_swa_lrs
-
-                        swa_epoch_start = [int(arg.split('=')[1]) for arg in args.swa_args if 'swa_epoch_start' in arg]
-                        swa_epoch_start = swa_epoch_start[0] if swa_epoch_start else default_swa_epoch_start
-
-                        annealing_epochs = [int(arg.split('=')[1]) for arg in args.swa_args if 'annealing_epochs' in arg]
-                        annealing_epochs = annealing_epochs[0] if annealing_epochs else default_annealing_epochs
-
-                        annealing_strategy = [arg.split('=')[1] for arg in args.swa_args if 'annealing_strategy' in arg]
-                        annealing_strategy = annealing_strategy[0] if annealing_strategy else default_annealing_strategy
-
-                    except (ValueError, IndexError) as e:
-                        print(f"Error parsing swa_args: {e}. Using default SWA parameters.")
-                        swa_lrs = default_swa_lrs
-                        swa_epoch_start = default_swa_epoch_start
-                        annealing_epochs = default_annealing_epochs
-                        annealing_strategy = default_annealing_strategy
-                else:
-                    # If no swa_args, use default SWA parameters
-                    print("No SWA arguments provided. Using default values.")
-                    swa_lrs = default_swa_lrs
-                    swa_epoch_start = default_swa_epoch_start
-                    annealing_epochs = default_annealing_epochs
-                    annealing_strategy = default_annealing_strategy
-
+                try:
+                    args.swa_args = convert_types(extract_arguments(args.swa_args))
+                    swa_lrs = args.swa_args.get('swa_lrs', 1e-4)
+                    swa_epoch_start = args.swa_args.get('swa_epoch_start', 10)
+                    annealing_epochs = args.swa_args.get('annealing_epochs', 10)
+                    annealing_strategy = args.swa_args.get('annealing_strategy', 'cos')
+                except (ValueError, IndexError) as e:
+                    print(f"Error parsing swa_args: {e}.")
+                    swa_lrs = 1e-4
+                    swa_epoch_start = 10
+                    annealing_epochs = 10
+                    annealing_strategy = 'cos'
+                
                 # Log the chosen SWA parameters
                 print(f"Using SWA parameters: "
                       f"swa_lrs={swa_lrs}, "
                       f"swa_epoch_start={swa_epoch_start}, "
                       f"annealing_epochs={annealing_epochs}, "
                       f"annealing_strategy={annealing_strategy}")
-
+                
                 # Append the SWA callback with the parsed (or default) parameters
                 callbacks.append(StochasticWeightAveraging(
                     swa_lrs=swa_lrs, 
@@ -310,9 +360,13 @@ def define_callbacks(args, callback_names: list):
     return callbacks
 
 class FineTuneLearningRateFinder(LearningRateFinder):
-    def __init__(self, milestones=0, *args, **kwargs):
+    def __init__(self, milestones=0, min_lr:float=1e-6, max_lr: float= 0.1, num_training_steps: int = 100, mode: str ='cos', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.milestones = milestones
+        self.min_lr = min_lr
+        self.max_lr = max_lr
+        self.num_training_steps = num_training_steps
+        self.mode = mode
 
     def on_fit_start(self, *args, **kwargs):
         return
@@ -500,6 +554,8 @@ def parse_arguments():
     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
     nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
     nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
+
+    nn_common_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
     nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
 
     # NN Train parser
