@@ -7,10 +7,17 @@ from torch.utils.data import DataLoader
 import tifffile as tiff
 from torchvision import transforms
 
+#DEBUG
+# Debugging high mem usage
+from torch.profiler import profile, record_function, ProfilerActivity
+import socket
+import logging
+from datetime import datetime, timedelta
+
 #from utils.
 # TODO: Put utils. in front, after finishing testing
 # from utils.padding import pad
-from utils.transform import scale, normalize, pad
+from transform import scale, normalize, pad
 import lightning as L
 
 def match_labels_to_images(labels_dict, crop_dir, label_to_directory_file):
@@ -130,9 +137,9 @@ class CustomDataModule(L.LightningDataModule):
         self.test_image_names = test_image_names
 
         self.transform = transforms.Compose([
-            pad(self.target_size),
-            scale(0, 1),
-            normalize(0.5, 0.5)
+            pad(self.target_size)
+            #scale(0, 1),
+            #normalize(0.5, 0.5)
         ])
 
         self.intensities = {}
@@ -147,24 +154,39 @@ class CustomDataModule(L.LightningDataModule):
         Prepares the data by loading setup file if it exists, labels, handling errors, and matching labels to images.
         """
         # Error handling for setup file and directories
-        assert self.setup_file is not None or (self.root_dir is not None and self.crop_dir is not None and self.label_dir is not None and self.label_to_directory is not None), \
-            'Either setup_file or root_dir, crop_dir, label_dir, and label_to_directory must be provided'
+        try:
+            assert self.setup_file is not None or (self.root_dir and self.crop_dir and self.label_dir and self.label_to_directory), \
+                'Either setup_file or root_dir, crop_dir, label_dir, and label_to_directory must be provided'
+        except AssertionError as e:
+            raise ValueError(f"Invalid configuration: {e}")
 
         # Load setup information from file
         if self.setup_file:
             print(f'Loading setup information from {self.setup_file}')
-            with open(self.setup_file) as f:
-                setup_info = json.load(f)
-                self.root_dir = setup_info['root_dir']
-                self.crop_dir = setup_info['crop_dir']
-                self.label_dir = setup_info['label_dir']
-                self.target_size = setup_info['target_size']
-                self.batch_size = setup_info['batch_size'] if self.batch_size is None else self.batch_size
-                self.train_image_names = setup_info['train_image_names']
-                self.val_image_names = setup_info['val_image_names']
-                self.test_image_names = setup_info['test_image_names']
-                self.label_to_directory = setup_info['label_to_directory']
-                self.num_workers = setup_info['num_workers']  if self.num_workers is None else self.num_workers
+            try:
+                with open(self.setup_file, 'r') as f:
+                    setup_info = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError) as e:
+                raise ValueError(f"Error loading setup file: {e}")
+        
+            # Ensure all necessary keys are present in the setup file
+            required_keys = ['root_dir', 'crop_dir', 'label_dir', 'target_size', 'train_image_names', 'val_image_names', 'test_image_names', 'label_to_directory']
+            missing_keys = [key for key in required_keys if key not in setup_info]
+            if missing_keys:
+                raise KeyError(f"Missing keys in setup file: {missing_keys}")
+        
+            # Assign setup parameters
+            self.root_dir = setup_info['root_dir']
+            self.crop_dir = setup_info['crop_dir']
+            self.label_dir = setup_info['label_dir']
+            self.target_size = setup_info['target_size']
+            self.batch_size = setup_info.get('batch_size', self.batch_size)
+            self.train_image_names = setup_info['train_image_names']
+            self.val_image_names = setup_info['val_image_names']
+            self.test_image_names = setup_info['test_image_names']
+            self.label_to_directory = setup_info['label_to_directory']
+            self.num_workers = setup_info.get('num_workers', self.num_workers)
+
 
         # Load label files with error handling
         labels_dict = load_labels(self.label_dir)
@@ -286,8 +308,16 @@ def main():
     data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
 
     # Prepare data and loaders
-    data_module.prepare_data()
-    data_module.setup()
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True, record_shapes=True) as prof:
+        with record_function("datamodule_prep"):
+            data_module.prepare_data()
+    
+    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
+          
+    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True, record_shapes=True) as prof:
+        with record_function("datamodule_setup"):
+            data_module.setup()
+    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
 
     # Get the train, validation, and test loaders
     train_loader = data_module.train_dataloader()
@@ -302,3 +332,47 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+#DEBUG:
+'''
+With no transforms:
+STAGE:2024-10-01 14:44:30 7306:195153 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-10-01 14:44:30 7306:195153 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+-----------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                   Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg       CPU Mem  Self CPU Mem    # of Calls  
+-----------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+    aten::empty_strided         0.15%       2.352ms         0.15%       2.352ms       0.523us     191.92 Mb     191.92 Mb          4500  
+            aten::copy_         2.73%      42.728ms         2.73%      42.728ms       9.495us     163.59 Mb     151.31 Mb          4500  
+               aten::to         0.42%       6.497ms         3.49%      54.617ms      12.137us     308.05 Mb      38.60 Mb          4500  
+       aten::lift_fresh         0.00%       4.000us         0.00%       4.000us       0.001us           0 b           0 b          4500  
+        aten::unsqueeze         0.34%       5.267ms         0.35%       5.440ms       1.209us           0 b           0 b          4500  
+       aten::as_strided         0.01%     173.000us         0.01%     173.000us       0.038us           0 b           0 b          4500  
+         aten::_to_copy         0.72%      11.287ms         3.38%      52.853ms      11.745us     308.05 Mb     -30.90 Mb          4500  
+        datamodule_prep        95.64%        1.497s       100.00%        1.565s        1.565s     308.05 Mb     -42.90 Mb             1  
+-----------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 1.565s
+
+Only padding:
+STAGE:2024-10-01 14:45:53 7432:196733 ActivityProfilerController.cpp:320] Completed Stage: Collection
+STAGE:2024-10-01 14:45:53 7432:196733 ActivityProfilerController.cpp:324] Completed Stage: Post Processing
+-------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                     Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg       CPU Mem  Self CPU Mem    # of Calls  
+-------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+              aten::empty         0.38%      16.205ms         0.38%      16.205ms       3.601us      11.74 Gb      11.74 Gb          4500  
+              aten::fill_        40.52%        1.733s        40.52%        1.733s     385.121us       7.23 Gb       7.19 Gb          4500  
+                aten::pad         5.04%     215.465ms        44.66%        1.910s     424.393us      16.26 Gb       1.83 Gb          4500  
+      aten::empty_strided         0.09%       3.918ms         0.09%       3.918ms       0.871us     218.78 Mb     218.78 Mb          4500  
+              aten::copy_         1.89%      80.793ms         1.89%      80.793ms       8.977us     130.48 Mb     130.02 Mb          9000  
+                 aten::to         0.17%       7.476ms         1.20%      51.378ms      11.417us     308.05 Mb      39.76 Mb          4500  
+         aten::lift_fresh         0.00%      59.000us         0.00%      59.000us       0.013us           0 b           0 b          4500  
+             aten::narrow         0.70%      30.093ms         1.35%      57.922ms       2.146us           0 b           0 b         26994  
+              aten::slice         0.60%      25.638ms         0.67%      28.858ms       1.069us           0 b           0 b         26994  
+         aten::as_strided         0.09%       3.777ms         0.09%       3.777ms       0.120us           0 b           0 b         31494  
+-------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 4.277s
+
+
+
+
+
+'''
