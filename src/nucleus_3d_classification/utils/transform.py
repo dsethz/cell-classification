@@ -11,22 +11,21 @@ class pad:
         depth, height, width = img.shape
         target_depth, target_height, target_width = self.target_size
         
-        # Padding if necessary
-        pad_depth = (target_depth - depth) if depth < target_depth else 0
-        pad_height = (target_height - height) if height < target_height else 0
-        pad_width = (target_width - width) if width < target_width else 0
+        pad_depth = max(0, target_depth - depth)
+        pad_height = max(0, target_height - height)
+        pad_width = max(0, target_width - width)
         
         # Padding in depth, height, width directions
         padding = (
-            pad_width // 2, pad_width - pad_width // 2, 
-            pad_height // 2, pad_height - pad_height // 2, 
-            pad_depth // 2, pad_depth - pad_depth // 2
-        )
+                pad_width // 2, pad_width - pad_width // 2,
+                pad_height // 2, pad_height - pad_height // 2,
+                pad_depth // 2, pad_depth - pad_depth // 2
+                )
+        img = F.pad(img, padding)
 
         # TODO: Resize if necessary, not implemented yet
         # img = F.resize(img, self.target)
 
-        img = F.pad(img, padding)
         return img
 
 class scale:

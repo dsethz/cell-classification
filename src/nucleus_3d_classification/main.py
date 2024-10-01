@@ -502,7 +502,10 @@ def load_data_module(args):
             data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
     elif args.data_module == "CustomDataModule":
         if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO: This should later be able to be superseeded by providing individual directories for all files as well
-            setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
+            try:
+                setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
+            except FileNotFoundError: # TODO remove this logic later
+                pass
         else:
             setup_file = args.setup_file
 
@@ -524,11 +527,14 @@ def load_data_module(args):
         raise ValueError(f"Unknown data module: {args.data_module}")
     
     data_module.prepare_data()
-    data_module.setup()
+    data_module.setup() # TODO: Add stage argument
+    # try:
+    #     data_module.setup(stage = args.stage)
+    # except AttributeError:
+    #     pass
     return data_module
 
 def train_nn_model(args):
-    
     data_module = load_data_module(args)
     loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), args.loss_fn, weight=args.loss_weight)
     extra_args = get_extra_args(args, loss_fn=loss_fn)
@@ -540,12 +546,12 @@ def train_nn_model(args):
     print("Training with the following configuration:", args)
 
     # Profiling memory
-    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True, record_shapes=True) as prof:
-        with record_function("model_inference"):
-            trainer.fit(model, datamodule=data_module)
-    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
-    print(prof.key_averages().table(sort_by="cpu_memory_usage", row_limit=10))
-    print(prof.key_averages().table(sort_by='self_cuda_memory_usage', row_limit=20))
+    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], profile_memory=True, record_shapes=True) as prof:
+    #     with record_function("model_inference"):
+    #         trainer.fit(model, datamodule=data_module)
+    # print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=20))
+    # print(prof.key_averages().table(sort_by="cpu_memory_usage", row_limit=20))
+    # print(prof.key_averages().table(sort_by='self_cuda_memory_usage', row_limit=30))
 
     # Same with other logger:
     # Start recording memory snapshot history
@@ -558,7 +564,6 @@ def train_nn_model(args):
 
     # Stop recording memory snapshot history
     stop_record_memory_history()
-
 
 
 
@@ -639,7 +644,6 @@ def predict_nn_model(args):
     if model is None:
         raise FileNotFoundError(f"Model file not found. Tried the following paths: {model_paths}")
 
-    
     data_module = load_data_module(args)
     trainer = define_trainer(args)
 

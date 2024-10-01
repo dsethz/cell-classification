@@ -373,7 +373,8 @@ class testNet(L.LightningModule):
         '''
         This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
         The default parameters are the same as in the Pytorch implementation of ResNet at https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py,
-        checked at 2024-09-18, using the stride for downsampling at the second 3x3x3 convolution, additionally, the model is adapted to work with 3D data.
+        checked at 2024-09-18, using the stride for downsampling at the second 3x3x3 convolution, additionally, the model is adapted to work with 3D data,
+        using 3D convolutions instead of 2D and a leakyReLU is default instead of the normal ReLU.
         The model can be modified to have a different number of layers in each block, by changing the layers parameter, as well as allowing the ceil_mode
         parameter to be set to True or False for the max pooling layer (for odd inputs). An extra padding layer can be added after the max pooling layer
         to ensure that the data is the correct size for the first residual block.
@@ -424,7 +425,7 @@ class testNet(L.LightningModule):
         elif leaky == False:
             self.relu = nn.ReLU(inplace=True)
 
-        self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=34, stride=(1,2,2), padding=3, bias=False)
+        self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=10, stride=(1,2,2), padding=3, bias=False)
         self.bn1 = nn.BatchNorm3d(self.initial_out_channels)
         #self.relu = nn.ReLU(inplace=True)
 
@@ -444,6 +445,9 @@ class testNet(L.LightningModule):
 
     def forward(self, x):
         #print(f"Input shape: {x.shape}")
+        # Resize to 10x10x10 for testing:
+        #print(f"Before Resize: {x.shape}")
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
