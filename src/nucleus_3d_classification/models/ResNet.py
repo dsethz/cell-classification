@@ -226,7 +226,7 @@ class ResNet(L.LightningModule):
 
         # Calculate accuracy, precision, recall, etc.
         total_val = self.val_tp + self.val_fp + self.val_tn + self.val_fn
-        accuracy_val = (self.val_tp + self.val_tn) / total if total > 0 else 0
+        accuracy_val = (self.val_tp + self.val_tn) / total_val if total_val > 0 else 0
         precision_val = self.val_tp / (self.val_tp + self.val_fp) if (self.val_tp + self.val_fp) > 0 else 0
         recall_val = self.val_tp / (self.val_tp + self.val_fn) if (self.val_tp + self.val_fn) > 0 else 0
         f1_score_val = 2 * (precision_val * recall_val) / (precision_val + recall_val) if (precision_val + recall_val) > 0 else 0
@@ -362,6 +362,258 @@ def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual
     and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
     '''
     return ResNet(block=Block, layers=[3,8,36,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn)
+
+class testNet(L.LightningModule):
+    def __init__(self, layers=0, num_classes=2, block=Block,
+                image_channels=1, ceil_mode=False,
+                zero_init_resudual: bool = False, # TODO: Check if we can implement this
+                padding_layer_sizes=None, learning_rate=1e-5,
+                loss_fn = 'cross_entropy', scheduler_type=None, step_size=10, gamma=0.9, leaky=True):
+        super().__init__()
+        '''
+        This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
+        The default parameters are the same as in the Pytorch implementation of ResNet at https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py,
+        checked at 2024-09-18, using the stride for downsampling at the second 3x3x3 convolution, additionally, the model is adapted to work with 3D data.
+        The model can be modified to have a different number of layers in each block, by changing the layers parameter, as well as allowing the ceil_mode
+        parameter to be set to True or False for the max pooling layer (for odd inputs). An extra padding layer can be added after the max pooling layer
+        to ensure that the data is the correct size for the first residual block.
+        '''
+
+        # Variables
+        self.initial_out_channels = 64
+        self.in_channels = self.initial_out_channels
+        self.padding_layer_sizes = padding_layer_sizes
+        self.learning_rate = learning_rate
+        self.ceil_mode = ceil_mode
+        
+        self.scheduler_type = scheduler_type
+        self.step_size = step_size
+        self.gamma = gamma
+
+        # Initialize TP, FP, TN, FN counters
+        self.tp = 0
+        self.fp = 0
+        self.tn = 0
+        self.fn = 0
+
+        self.val_tp=0
+        self.val_fp=0
+        self.val_tn=0
+        self.val_fn=0
+
+        # Save Hyperparameters
+        self.save_hyperparameters()
+
+        # Loss fn handling
+        match loss_fn:
+            case 'cross_entropy':
+                self.loss_fn = F.cross_entropy
+            case 'mse':
+                self.loss_fn = F.mse_loss
+            case _:
+                try:
+                    self.loss_fn = loss_fn
+                    print(f"Using custom loss function: {loss_fn}")
+                except:
+                    return ValueError(f"Loss function {loss_fn} not supported for this model!")
+
+        # INITIAL LAYERS
+
+        if leaky == True:
+            self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+        elif leaky == False:
+            self.relu = nn.ReLU(inplace=True)
+
+        self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=34, stride=(1,2,2), padding=3, bias=False)
+        self.bn1 = nn.BatchNorm3d(self.initial_out_channels)
+        #self.relu = nn.ReLU(inplace=True)
+
+        # FINAL LAYERS
+
+        # Avg pool
+        self.avg_pool = nn.AdaptiveAvgPool3d((1,1,1))
+        # FC
+        self.fc = nn.Linear(self.initial_out_channels, num_classes)
+    
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            elif isinstance(m, nn.BatchNorm3d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        #print(f"Input shape: {x.shape}")
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        x = self.avg_pool(x)
+        #print(f"After AvgPool: {x.shape}")
+        x = x.view(x.size(0), -1)
+        #print(f"After Reshape: {x.shape}")
+        x = self.fc(x)
+        #print(f"After FC: {x.shape}")
+
+        return x
+
+    def make_layers(self, block, num_blocks, out_channels, stride):
+
+        layers = []
+        layers.append(block(self.in_channels, out_channels, stride))
+        self.in_channels = out_channels*4
+
+        for i in range(num_blocks-1): # -1 cause above we create 1 already
+            layers.append(block(self.in_channels,out_channels))
+
+        return nn.Sequential(*layers)
+    
+    def print_model(self):
+        print(self)
+    
+    def training_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+        x, y = batch
+        y_hat = self.forward(x)
+        loss = loss_fn(y_hat, y)
+        self.log('training_loss', loss, sync_dist=True)
+        return loss
+    
+    def validation_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+        x, y = batch
+        y_hat = self.forward(x)
+        val_loss = loss_fn(y_hat, y)
+
+        y_pred_class = torch.argmax(y_hat, dim=1)        
+        # Flatten tensors for comparison if they have extra dimensions
+        y = y.view(-1)
+        predicted_classes = y_pred_class.view(-1)
+
+        # Calculate TP, FP, TN, FN
+        self.val_tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
+        self.val_fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
+        self.val_tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
+        self.val_fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
+                # Optional: print for debugging purposes
+        #print(f"Predicted: {predicted_classes}, True: {y}")
+        #self.log('val_loss', val_loss,sync_dist=True)
+
+        # # Calculate accuracy, precision, recall
+        #     # convert to probabilities
+        # y_pred_proba = torch.softmax(y_hat, dim=1)
+        # acc = self.accuracy(y_hat, y)
+
+        values = {"val_loss": val_loss}
+        self.log_dict(values, on_epoch=True, prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+
+        return val_loss
+
+    def on_validation_epoch_end(self):
+
+        # Calculate accuracy, precision, recall, etc.
+        total_val = self.val_tp + self.val_fp + self.val_tn + self.val_fn
+        accuracy_val = (self.val_tp + self.val_tn) / total_val if total_val > 0 else 0
+        precision_val = self.val_tp / (self.val_tp + self.val_fp) if (self.val_tp + self.val_fp) > 0 else 0
+        recall_val = self.val_tp / (self.val_tp + self.val_fn) if (self.val_tp + self.val_fn) > 0 else 0
+        f1_score_val = 2 * (precision_val * recall_val) / (precision_val + recall_val) if (precision_val + recall_val) > 0 else 0
+
+        # Log or print your metrics
+        self.log('val_accuracy', accuracy_val, on_epoch=True, sync_dist=True)
+        self.log('precision_val', precision_val, on_epoch=True, sync_dist=True)
+        self.log('recall_val', recall_val, on_epoch=True, sync_dist=True)
+        self.log('f1_score_val', f1_score_val, on_epoch=True, sync_dist=True)
+
+        self.log('tp_val', self.val_tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fp_val', self.val_fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('tn_val', self.val_tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fn_val', self.val_fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('total_val', total_val, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+
+        # Print for debugging
+        print(f"Validation Accuracy: {accuracy_val}, Validation Precision: {precision_val}, Validation Recall: {recall_val}, Validation F1 Score: {f1_score_val}")
+    
+    def test_step(self, batch, batch_idx):
+        loss_fn = self.loss_fn
+
+        x, y = batch
+        y_hat = self.forward(x)
+        Test_step_loss = loss_fn(y_hat, y)
+
+        # Apply softmax to get probabilities
+        #y_pred_proba = torch.softmax(y_hat, dim=1)
+        
+        # Get predicted class
+        y_pred_class = torch.argmax(y_hat, dim=1)
+
+        # Flatten tensors for comparison if they have extra dimensions
+        y = y.view(-1)
+        predicted_classes = y_pred_class.view(-1)
+
+        # Calculate TP, FP, TN, FN
+        self.tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
+        self.fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
+        self.tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
+        self.fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
+                # Optional: print for debugging purposes
+        #print(f"Predicted: {predicted_classes}, True: {y}")
+
+        return Test_step_loss
+    
+    def on_test_epoch_end(self):
+        # Calculate accuracy, precision, recall, etc.
+        total = self.tp + self.fp + self.tn + self.fn
+        accuracy = (self.tp + self.tn) / total if total > 0 else 0
+        precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
+        recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
+
+        # Log or print your metrics
+        self.log('test_accuracy', accuracy, on_epoch=True, sync_dist=True)
+        self.log('test_precision', precision, on_epoch=True, sync_dist=True)
+        self.log('test_recall', recall, on_epoch=True, sync_dist=True)
+        self.log('test_f1_score', f1_score, on_epoch=True, sync_dist=True)
+
+        self.log('tp', self.tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fp', self.fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('tn', self.tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fn', self.fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('total', total, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+
+        # Print for debugging
+        print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
+
+    
+    def predict_step(self, x):
+        # TODO: Check this out
+        x = self.forward(x)
+        return x
+    
+    def configure_optimizers(self): # TODO: Implement scheduler
+        optimizer = optim.Adam(self.parameters(), lr=self.learning_rate)
+        if self.scheduler_type is None:
+            return optimizer
+        else:
+            # Initialize the learning rate scheduler based on the specified type
+            if self.scheduler_type == 'StepLR':
+                scheduler = lr_scheduler.StepLR(optimizer, step_size=self.step_size, gamma=self.gamma)
+            elif self.scheduler_type == 'ReduceLROnPlateau':
+                scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.1, patience=10, verbose=True)
+            elif self.scheduler_type == 'ExponentialLR':
+                scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
+            else:
+                print(f"Unknown scheduler type: {self.scheduler_type}")
+                print(f"Using default optimizer: Adam with lr={self.learning_rate}")
+                return optimizer
+
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': {
+                'scheduler': scheduler,
+                'interval': 'epoch',  # or 'step', depending on the scheduler
+                'frequency': 1,       # How often to call the scheduler (every epoch or every step)
+            },
+        }
 
 ######################################################################################################################
 

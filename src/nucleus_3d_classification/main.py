@@ -99,6 +99,10 @@ import logging
 from datetime import datetime, timedelta
 import torch
 
+from lightning.pytorch import seed_everything
+seed_everything(42)
+
+
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
@@ -107,7 +111,7 @@ from utils.testdatamodule import BaseDataModule
 from utils.datamodule import CustomDataModule
 from utils.loss_fn import create_loss_fn_with_weights, calculate_class_weights
 from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
-from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers
+from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers, testNet
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
 from lightning.pytorch.callbacks import LearningRateFinder, StochasticWeightAveraging
@@ -163,7 +167,7 @@ def get_nn_model(model_name: str, extra_args: dict = None):
         return BaseNNModel()
     elif model_name == "BaseNNModel2":
         return BaseNNModel2(layers = extra_args['layers'])
-    elif model_name in ["ResNet50", "ResNet101", "ResNet152"]:
+    elif model_name in ["ResNet50", "ResNet101", "ResNet152", "testNet"]:
         return globals()[model_name](
             ceil_mode=extra_args['ceil_mode'],
             num_classes=extra_args['num_classes'],
@@ -188,7 +192,7 @@ def get_nn_model_class(model_name: str):
     model = globals()[model_name]
 
     # For some imports we have functions, not classes, thus we need to call the models in order to get the class object
-    if callable(model) and model_name in ["ResNet50", "ResNet_custom_layers", "ResNet101", "ResNet152"]:
+    if callable(model) and model_name in ["ResNet50", "ResNet_custom_layers", "ResNet101", "ResNet152", "testNet"]:
         try:
             model = model()
         except TypeError:
@@ -298,7 +302,7 @@ def define_callbacks(args, callback_names: list):
     callbacks = []
     for callback_name in callback_names if callback_names is not None else []:
         if callback_name == "early_stopping":
-            if not hasattr(args, monitor_stop):
+            if not hasattr(args, 'monitor_stop'):
                 args.monitor_stop = "val_loss"
             callbacks.append(pl.callbacks.EarlyStopping(monitor=args.monitor_stop))
         # elif callback_name == "model_checkpoint":
@@ -483,7 +487,8 @@ def define_trainer(args, callbacks=None):
         'enable_checkpointing': args.enable_checkpointing,
         'strategy': args.strategy,
         'gradient_clip_val': args.gradient_clip_val,
-        'callbacks': callbacks
+        'callbacks': callbacks,
+        'deterministic': True # TODO DISABLE LATER
     }
     print(f"Trainer kwargs: {trainer_kwargs}")
     return L.Trainer(**trainer_kwargs)
@@ -693,7 +698,7 @@ def parse_arguments():
     nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
     nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
     nn_common_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule")
-    nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2'], help="Model class to use")
+    nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
     # nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
     # nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
     # nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
