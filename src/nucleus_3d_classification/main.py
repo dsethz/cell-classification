@@ -430,8 +430,8 @@ def replace_filename(args):
 
 def clean_filename(filename):
     # Set of special characters to be replaced with an underscore
-    special_chars = {'/', '\\', ':', '*', '?', '"', '<', '>', '|', "'", '!', '@', '#', '$', '%', '^', '&', '(', ')', '+', '=', '{', '}', '[', ']', ';', ',', '.', '`', '~', ' '}
-    
+    #special_chars = {'/', '\\', ':', '*', '?', '"', '<', '>', '|', "'", '!', '@', '#', '$', '%', '^', '&', '(', ')', '+', '=', '{', '}', '[', ']', ';', ',', '.', '`', '~', ' '}
+    special_chars = {"'", '"', '/', '\\', ' '}
     # Use regex to replace all special characters in the set with an underscore
     return re.sub(r'[{}]'.format(re.escape(''.join(special_chars))), '_', filename)
 
