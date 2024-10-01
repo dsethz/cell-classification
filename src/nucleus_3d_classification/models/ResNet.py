@@ -9,7 +9,7 @@ class Block(nn.Module):
     '''
     This class is a single block of the ResNet model. It consists of 3 convolutional layers and can have an identity downsample.
     '''
-    def __init__(self, in_channels, out_channels, stride=1, bias=False):
+    def __init__(self, in_channels, out_channels, stride=1, bias=False, leaky=True):
         super(Block, self).__init__()
         self.expansion = 4
 
@@ -19,7 +19,10 @@ class Block(nn.Module):
         self.bn1 = nn.BatchNorm3d(out_channels)
         self.conv2 = nn.Conv3d(out_channels, out_channels * self.expansion, kernel_size=1, stride=1, padding=0, bias=bias)
         self.bn2 =nn.BatchNorm3d(out_channels*self.expansion)
-        self.relu = nn.ReLU(inplace=True)
+        if leaky == True:
+            self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+        elif leaky == False:
+            self.relu = nn.ReLU(inplace=True)
         
         if stride != 1 or in_channels != out_channels*self.expansion:
             self.identity_downsample = nn.Sequential(
@@ -51,7 +54,7 @@ class ResNet(L.LightningModule):
                 image_channels=1, ceil_mode=False,
                 zero_init_resudual: bool = False, # TODO: Check if we can implement this
                 padding_layer_sizes=None, learning_rate=1e-5,
-                loss_fn = 'cross_entropy', scheduler_type=None, step_size=10, gamma=0.9):
+                loss_fn = 'cross_entropy', scheduler_type=None, step_size=10, gamma=0.9, leaky=True):
         super(ResNet, self).__init__()
         '''
         This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
@@ -79,6 +82,11 @@ class ResNet(L.LightningModule):
         self.tn = 0
         self.fn = 0
 
+        self.val_tp=0
+        self.val_fp=0
+        self.val_tn=0
+        self.val_fn=0
+
         # Save Hyperparameters
         self.save_hyperparameters()
 
@@ -97,9 +105,14 @@ class ResNet(L.LightningModule):
 
         # INITIAL LAYERS
 
+        if leaky == True:
+            self.relu = nn.LeakyReLU(negative_slope=0.01, inplace=True)
+        elif leaky == False:
+            self.relu = nn.ReLU(inplace=True)
+
         self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=7, stride=(1,2,2), padding=3, bias=False)
         self.bn1 = nn.BatchNorm3d(self.initial_out_channels)
-        self.relu = nn.ReLU(inplace=True)
+        #self.relu = nn.ReLU(inplace=True)
         self.max_pool = nn.MaxPool3d(kernel_size=3, stride=(1,2,2), padding=1, ceil_mode=ceil_mode) # TODO: Check if want ceil mode true
 
         # RESIDUAL BLOCKS
@@ -185,17 +198,53 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
-        self.log('val_loss', val_loss,sync_dist=True)
+        y_pred_class = torch.argmax(y_hat, dim=1)        
+        # Flatten tensors for comparison if they have extra dimensions
+        y = y.view(-1)
+        predicted_classes = y_pred_class.view(-1)
+
+        # Calculate TP, FP, TN, FN
+        self.val_tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
+        self.val_fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
+        self.val_tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
+        self.val_fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
+                # Optional: print for debugging purposes
+        #print(f"Predicted: {predicted_classes}, True: {y}")
+        #self.log('val_loss', val_loss,sync_dist=True)
 
         # # Calculate accuracy, precision, recall
         #     # convert to probabilities
         # y_pred_proba = torch.softmax(y_hat, dim=1)
         # acc = self.accuracy(y_hat, y)
 
-        # values = {"val_loss": val_loss, "val_accuracy": acc}
-        # self.log_dict(values, on_epoch=True, prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
+        values = {"val_loss": val_loss}
+        self.log_dict(values, on_epoch=True, prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
 
         return val_loss
+
+    def on_validation_epoch_end(self):
+
+        # Calculate accuracy, precision, recall, etc.
+        total_val = self.val_tp + self.val_fp + self.val_tn + self.val_fn
+        accuracy_val = (self.val_tp + self.val_tn) / total if total > 0 else 0
+        precision_val = self.val_tp / (self.val_tp + self.val_fp) if (self.val_tp + self.val_fp) > 0 else 0
+        recall_val = self.val_tp / (self.val_tp + self.val_fn) if (self.val_tp + self.val_fn) > 0 else 0
+        f1_score_val = 2 * (precision_val * recall_val) / (precision_val + recall_val) if (precision_val + recall_val) > 0 else 0
+
+        # Log or print your metrics
+        self.log('val_accuracy', accuracy_val, on_epoch=True, sync_dist=True)
+        self.log('precision_val', precision_val, on_epoch=True, sync_dist=True)
+        self.log('recall_val', recall_val, on_epoch=True, sync_dist=True)
+        self.log('f1_score_val', f1_score_val, on_epoch=True, sync_dist=True)
+
+        self.log('tp_val', self.val_tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fp_val', self.val_fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('tn_val', self.val_tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('fn_val', self.val_fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log('total_val', total_val, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+
+        # Print for debugging
+        print(f"Validation Accuracy: {accuracy_val}, Validation Precision: {precision_val}, Validation Recall: {recall_val}, Validation F1 Score: {f1_score_val}")
     
     def test_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
