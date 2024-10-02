@@ -221,7 +221,7 @@ class CustomDataModule(L.LightningDataModule):
             idxa = 0
             for image in tif_images:
                 idxa += 1
-                if idxa % 2 == 0:
+                if idxa % 101 == 0:
                     print(f"Processed {idxa} images for {name}.")
                     break
 

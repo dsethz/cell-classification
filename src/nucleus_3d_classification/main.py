@@ -535,6 +535,13 @@ def load_data_module(args):
     return data_module
 
 def train_nn_model(args):
+
+
+    # Same with other logger: #TODO DELETE THIS LATER
+    # Start recording memory snapshot history
+    start_record_memory_history()
+
+
     data_module = load_data_module(args)
     loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), args.loss_fn, weight=args.loss_weight)
     extra_args = get_extra_args(args, loss_fn=loss_fn)
@@ -555,7 +562,7 @@ def train_nn_model(args):
 
     # Same with other logger:
     # Start recording memory snapshot history
-    start_record_memory_history()
+    # start_record_memory_history()
 
     trainer.fit(model, datamodule=data_module)
 

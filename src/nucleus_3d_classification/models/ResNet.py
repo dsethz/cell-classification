@@ -330,38 +330,38 @@ class ResNet(L.LightningModule):
 
     
 
-def ResNet_custom_layers(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, layers=[1,1,1,1], loss_fn='cross_entropy'):
+def ResNet_custom_layers(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, layers=[1,1,1,1], loss_fn='cross_entropy', learning_rate=1e-5):
     '''
     This function creates a ResNet model with the specified number of classes and image channels.
     The layers parameter can be used to specify the number of layers in each block.
     The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
     and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
     '''
-    return ResNet(block=Block, layers=layers, num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn)
+    return ResNet(block=Block, layers=layers, num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn, learning_rate=learning_rate)
 
-def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy'):
+def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy' learning_rate=1e-5):
     '''
     This function creates a ResNet50 model with the specified number of classes and image channels.
     The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
     and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
     '''
-    return ResNet(block=Block, layers=[3,4,6,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn)
+    return ResNet(block=Block, layers=[3,4,6,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn, learning_rate=learning_rate)
 
-def ResNet101(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy'):
+def ResNet101(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy', learning_rate=1e-5):
     '''
     This function creates a ResNet101 model with the specified number of classes and image channels.
     The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
     and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
     '''
-    return ResNet(block=Block, layers=[3,4,23,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn)
+    return ResNet(block=Block, layers=[3,4,23,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn, learning_rate=learning_rate)
 
-def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy'):
+def ResNet152(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy', learning_rate=1e-5):
     '''
     This function creates a ResNet152 model with the specified number of classes and image channels.
     The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),
     and the padding_layer_sizes parameter can be set to a tuple of 6 integers to specify the padding before the first residual block.
     '''
-    return ResNet(block=Block, layers=[3,8,36,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn)
+    return ResNet(block=Block, layers=[3,8,36,3], num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn, learning_rate=learning_rate)
 
 class testNet(L.LightningModule):
     def __init__(self, layers=0, num_classes=2, block=Block,
