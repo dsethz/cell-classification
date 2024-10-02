@@ -42,6 +42,10 @@ class CustomDataset(torch.utils.data.Dataset):
         for file in self.files:
             mask_id = file.rsplit('_', 1)[-1].split('.')[0]
             label = self.labels.get(mask_id, None)  # Fetch the label based on the mask_id
+            if label is None or label == 'unknown':
+                print(f"Warning: No label found for mask_id {mask_id} in {self.label_file}")
+                # Skip appending
+                continue
             self.data.append({
                 'idx': idx,
                 'file': file,
