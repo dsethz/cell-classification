@@ -1,32 +1,54 @@
 import torch.nn.functional as F
 import torch
+from torchvision.transforms import v2
 import random
 
-
-class pad: # TODO: check if this should be a nn module and whatnot
+class pad(torch.nn.Module):
     def __init__(self, target_size):
+        """
+        Initializes the Pad module.
+
+        Args:
+            target_size (tuple): The desired target size for padding in the format (depth, height, width).
+        """
+        super().__init__()
         self.target_size = target_size
-    
-    def __call__(self, img):
-        depth, height, width = img.shape
+
+    def forward(self, x):
+        """
+        Pads the input tensor to the specified target size.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (D, H, W) where:
+                - D: Depth
+                - H: Height
+                - W: Width
+
+        Returns:
+            torch.Tensor: Padded tensor.
+        """
+        # Get the current shape of the input tensor
+        depth, height, width = x.shape  # Assuming input shape is (D, H, W)
         target_depth, target_height, target_width = self.target_size
         
+        # Calculate padding sizes for depth, height, and width
         pad_depth = max(0, target_depth - depth)
         pad_height = max(0, target_height - height)
         pad_width = max(0, target_width - width)
         
-        # Padding in depth, height, width directions
+        # Padding configuration: (left, right, top, bottom, front, back)
         padding = (
-                pad_width // 2, pad_width - pad_width // 2,
-                pad_height // 2, pad_height - pad_height // 2,
-                pad_depth // 2, pad_depth - pad_depth // 2
-                )
-        img = F.pad(img, padding)
+            pad_width // 2, pad_width - pad_width // 2,  # Width padding
+            pad_height // 2, pad_height - pad_height // 2,  # Height padding
+            pad_depth // 2, pad_depth - pad_depth // 2  # Depth padding
+        )
 
-        # TODO: Resize if necessary, not implemented yet
-        # img = F.resize(img, self.target)
+        # Apply padding using F.pad
+        # Note: F.pad expects input of shape (D, H, W)
+        padded_tensor = F.pad(x, padding, mode='constant', value=0)  # Use constant padding with value 0
+        #print(x.shape, padded_tensor.shape)
+        return padded_tensor
 
-        return img
 
 class scale:
     def __init__(self, min_val, max_val):
