@@ -58,8 +58,22 @@ class CustomDataset(torch.utils.data.Dataset):
         img_path = self.data[idx]['file']
         label = self.data[idx]['label']
 
+        if label is None:
+            raise ValueError(f"Error: No label found for mask_id {self.data[idx]['mask_id']} in {self.label_file}")
+        if not os.path.exists(os.path.join(self.crop_dir, img_path)):
+            raise FileNotFoundError(f"Error: Image file {img_path} not found in {self.crop_dir}")
+        if not label in [0, 1]:
+            raise ValueError(f"Error: Invalid label {label} found for mask_id {self.data[idx]['mask_id']} in {self.label_file}")
+        if not img_path.endswith('.tif'):
+            raise ValueError(f"Error: Invalid image file {img_path}. Only .tif files are supported.")
+
         # Load the image and apply transformations
         img = tiff.imread(os.path.join(self.crop_dir, img_path))
+
+        if img is None:
+            raise ValueError(f"Error: Failed to load image {img_path}.")
+        
+
         img = torch.from_numpy(img).float()
         if self.transform:
             img = self.transform(img)
@@ -152,6 +166,9 @@ def create_combined_dataset(data_list, target_size):
     """Helper function to create and combine datasets."""
     dataset_list = []
     
+    # Check if data_list is a single file path or a list of file paths
+    data_list = convert_to_list(data_list)
+
     # Step 1: Create individual CustomDataset objects and add to dataset_list
     for idx, item in enumerate(data_list):
         print(f"Creating dataset {idx + 1} for {item['label_file']} and {item['crop_dir']}")
