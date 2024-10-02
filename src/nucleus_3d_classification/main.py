@@ -162,6 +162,7 @@ def get_nn_model(model_name: str, extra_args: dict = None):
         extra_args = {}
 
     print(f"Creating model: {model_name} with extra_args: {extra_args}")
+    print(f"extra_args.loss_fn: {extra_args.get('loss_fn', None)}")
 
     if model_name == "BaseNNModel":
         return BaseNNModel()
@@ -488,7 +489,7 @@ def define_trainer(args, callbacks=None):
         'strategy': args.strategy,
         'gradient_clip_val': args.gradient_clip_val,
         'callbacks': callbacks,
-        'deterministic': True # TODO DISABLE LATER
+        'deterministic': False # TODO DISABLE LATER
     }
     print(f"Trainer kwargs: {trainer_kwargs}")
     return L.Trainer(**trainer_kwargs)
@@ -500,6 +501,7 @@ def load_data_module(args):
             data_module = BaseDataModule(data_dir="./data", batch_size=32)
         else:
             data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
+    
     elif args.data_module == "CustomDataModule":
         if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO: This should later be able to be superseeded by providing individual directories for all files as well
             try:
@@ -526,12 +528,7 @@ def load_data_module(args):
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
-    data_module.prepare_data()
     data_module.setup() # TODO: Add stage argument
-    # try:
-    #     data_module.setup(stage = args.stage)
-    # except AttributeError:
-    #     pass
     return data_module
 
 def train_nn_model(args):
@@ -543,7 +540,8 @@ def train_nn_model(args):
 
 
     data_module = load_data_module(args)
-    loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), args.loss_fn, weight=args.loss_weight)
+    #print(f"train loader is type {type(data_module.train_dataloader())}")
+    loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), loss_fn=args.loss_fn, weight=args.loss_weight)
     extra_args = get_extra_args(args, loss_fn=loss_fn)
     model = get_nn_model(args.model_class, extra_args)
 

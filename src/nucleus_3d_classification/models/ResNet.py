@@ -339,7 +339,7 @@ def ResNet_custom_layers(num_classes, image_channels=1, ceil_mode=False, zero_in
     '''
     return ResNet(block=Block, layers=layers, num_classes=num_classes, image_channels=image_channels, ceil_mode=ceil_mode, zero_init_resudual=zero_init_residual, padding_layer_sizes=padding_layer_sizes, loss_fn=loss_fn, learning_rate=learning_rate)
 
-def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy' learning_rate=1e-5):
+def ResNet50(num_classes, image_channels=1, ceil_mode=False, zero_init_residual=False, padding_layer_sizes=None, loss_fn='cross_entropy', learning_rate=1e-5):
     '''
     This function creates a ResNet50 model with the specified number of classes and image channels.
     The ceil_mode parameter can be set to True or False for the max pooling layer (for odd inputs),

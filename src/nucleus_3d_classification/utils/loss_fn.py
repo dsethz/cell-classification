@@ -34,6 +34,7 @@ def calculate_class_weights(dataloader):
     class_weights = class_weights / class_weights.sum()
 
     return class_weights
+import torch.nn.functional as F
 
 def create_loss_fn_with_weights(dataloader, loss_fn, weight=None):
     """
@@ -41,64 +42,44 @@ def create_loss_fn_with_weights(dataloader, loss_fn, weight=None):
 
     Args:
         dataloader (torch.utils.data.DataLoader): Training dataloader for calculating class weights.
+        loss_fn (str): Type of loss function to create ('cross_entropy', 'bce', 'mse').
+        weight (str or None): Weighting scheme for the loss ('balanced' or None).
 
     Returns:
-        function: A weighted loss function (cross_entropy) with calculated class weights.
+        function: A weighted loss function (cross_entropy, bce, or mse) with calculated class weights.
     """
+    if weight == 'balanced':
+        weight = calculate_class_weights(dataloader)
+        print("Calculated class weights are:", weight)
 
-    match weight:
-        case 'balanced':
-            weight = calculate_class_weights(dataloader)
+    if loss_fn == 'cross_entropy':
+        def weighted_loss(pred, target):
+            return F.cross_entropy(pred, target, weight=weight if weight == 'balanced' else None)
 
-            print("Calculated class weights are:", weight)
+    elif loss_fn == 'bce':
+        def weighted_loss(pred, target):
+            return F.binary_cross_entropy(pred, target, weight=weight if weight == 'balanced' else None)
 
-            match loss_fn:
-                case 'cross_entropy':
-                    def weighted_cross_entropy(pred, target):
-                        return F.cross_entropy(pred, target, weight=weight)
-                case 'bce':
-                    def weighted_bce(pred, target):
-                        return F.binary_cross_entropy(pred, target, weight=weight)
-                case 'mse':
-                    def weighted_mse(pred, target):
-                        return F.mse_loss(pred, target, weight=weight)
-                case _:
-                    raise ValueError(f"Invalid loss_fn argument: {loss_fn}")
+    elif loss_fn == 'mse':
+        def weighted_loss(pred, target):
+            return F.mse_loss(pred, target, weight=weight if weight == 'balanced' else None)
 
-        case None:
-            match loss_fn:
+    else:
+        raise ValueError(f"Invalid loss_fn argument: {loss_fn}")
 
-                case 'cross_entropy':
-                    def weighted_cross_entropy(pred, target):
-                        return F.cross_entropy(pred, target)
-                case 'bce':
-                    def weighted_bce(pred, target):
-                        return F.binary_cross_entropy(pred, target)
-                case 'mse':
-                    def weighted_mse(pred, target):
-                        return F.mse_loss(pred, target)
-                case _:
-                    raise ValueError(f"Invalid weight argument: {weight}")
-                
-        case _:
-            raise ValueError(f"Invalid weight argument: {weight}")
-            
-    return ValueError(f"Ivalid dataloader argument: {dataloader}")
+    return weighted_loss
 
-# Import customdata module
-# from datamodule import CustomDataModule
-# from padding import pad
 
-def main():
-    # Usage example:
-    data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
-    data_module.prepare_data()
-    data_module.setup()
-    train_dataloader = data_module.train_dataloader()
+# def main():
+    # # Usage example:
+    # data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json')
+    # data_module.prepare_data()
+    # data_module.setup()
+    # train_dataloader = data_module.train_dataloader()
 
-    # Create a loss function with dynamic class weights
-    loss_fn = create_loss_fn_with_weights(train_dataloader)
-    print(loss_fn, "and the class weights are:", calculate_class_weights(train_dataloader))
+    # # Create a loss function with dynamic class weights
+    # loss_fn = create_loss_fn_with_weights(train_dataloader)
+    # print(loss_fn, "and the class weights are:", calculate_class_weights(train_dataloader))
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()

@@ -3,7 +3,7 @@ import torch
 import random
 
 
-class pad:
+class pad: # TODO: check if this should be a nn module and whatnot
     def __init__(self, target_size):
         self.target_size = target_size
     
