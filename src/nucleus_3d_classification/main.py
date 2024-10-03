@@ -390,7 +390,7 @@ def define_callbacks(args, callback_names: list):
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback)
-
+        callbacks.append(ModelCheckpoint(save_top_k=1, save_on_train_epoch_end=False,monitor='f1_score_val',mode=args.mode,dirpath=args.dirpath,filename='best-f1_score-{epoch:02d}-{f1_score_val:.2f}'))
     return callbacks
 
 class FineTuneLearningRateFinder(LearningRateFinder):
@@ -419,22 +419,8 @@ def create_checkpoint_callback(args):
     # Dirpath -> check if exists, if not, create it
     create_dir_if_not_exists(args.dirpath)
 
-    return ModelCheckpoint(
-        save_top_k=args.save_top_k,
-        save_last=True, # Always saves last.ckpt
-        save_on_train_epoch_end=False, # Save at end of validation
-        monitor=args.monitor,
-        mode=args.mode,
-        dirpath=args.dirpath,
-        filename=args.filename # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
-        ), ModelCheckpoint(
-        save_top_k=1,
-        save_on_train_epoch_end=False,
-        monitor='f1_score_val',
-        mode=args.mode,
-        dirpath=args.dirpath,
-        filename='best-f1_score-{epoch:02d}-{f1_score_val:.2f}'
-        )
+    return ModelCheckpoint(save_top_k=args.save_top_k, save_last=True, save_on_train_epoch_end=False, monitor=args.monitor, mode=args.mode, dirpath=args.dirpath, filename=args.filename) 
+    # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
 
 def replace_filename(args):
     filename = args.filename
