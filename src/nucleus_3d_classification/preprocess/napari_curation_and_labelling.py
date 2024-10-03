@@ -281,6 +281,10 @@ viewer.window.add_dock_widget(save_button, area='right')
 viewer.window.add_dock_widget(mask_jump_widget, area='right')
 viewer.window.add_dock_widget(control_widget, area='right')
 
+# Bind hotkeys for next and previous mask
+viewer.bind_key('n', next_mask)
+viewer.bind_key('p', previous_mask)
+
 # Start the Napari viewer event loop
 napari.run()
 
