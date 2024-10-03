@@ -64,7 +64,7 @@ def main():
 
     os.makedirs(args.out_path, exist_ok=True)
 
-    out_path = args.out_path
+    path_out = args.out_path
     mask_coordinates_path = args.mask_coordinates_path
     mask_array_filtered_path = args.mask_array_path
     megakaryocyte_masks_path = args.mega_path
@@ -107,7 +107,7 @@ def main():
         z_coords = np.array(z_coords) # Convert to numpy array
         unique_z_layers = np.unique(z_coords) # Get the unique z-layers
 
-        max_area = counts.max() 
+        max_area = counts.max()
         # Save the max area for this mask
         mask_max_area[key] = max_area
 

@@ -143,17 +143,17 @@ class CustomDataModule(L.LightningDataModule):
             self.test_data = create_combined_dataset(self.test_data_names, self.target_size)
     
     def train_dataloader(self):
-        return DataLoader(self.training_data, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.training_data, batch_size=self.batch_size, shuffle=True, num_workers=self.num_workers)
     
     def val_dataloader(self):
-        return DataLoader(self.validation_data, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.validation_data, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
     
     def test_dataloader(self):
-        return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.test_data, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
     
     def predict_dataloader(self):
         # TODO: Change to predict data later on.
-        return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers)
+        return DataLoader(self.test_data, batch_size=self.batch_size, shuffle=False, num_workers=self.num_workers)
 
     def teardown(self, stage: str) -> None:
         return super().teardown(stage)

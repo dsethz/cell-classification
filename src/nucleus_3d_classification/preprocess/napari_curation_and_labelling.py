@@ -4,9 +4,8 @@
 # This file is not required, but it greatly improves the efficiency of the curation process by
 # allowing the user to jump to the next mask directly, speeding up the process.
 
-# Mask Dictionary is a dictionary that stores the cell type and centroid of each mask.
-# The cell type is assigned by the user, and the centroid is calculated from the mask coordinates.
-
+# Mask Dictionary is a dictionary that stores the cell type (under 'ctype') and centroid of each mask.
+# The cell type is assigned by the user, and the centroid is calculated from the mask coordinates (from the pickle dictionary file, if provided!).
 
 import napari
 import numpy as np
@@ -27,6 +26,7 @@ id_current = 0
 filtered_mask_ids = []  # List to store IDs of masks with the selected label
 current_filtered_idx = -1
 selected_label = None
+loaded_mask_dict = False
 
 # Function to select the labels layer
 @magicgui(call_button="Select Labels Layer", labels_layer={"choices": []})
@@ -50,12 +50,15 @@ def center_on_mask(labels_layer, mask_id):
     id_current = mask_id
 
     # Retrieve the coordinates from the dictionary
-    if mask_id in mask_dict:
-        z_indices, y_indices, x_indices = mask_dict[mask_id]
-        print(f'Mask ID {mask_id} found in the mask coord dictionary.')
+    if loaded_mask_dict:
+        if mask_id in mask_dict:
+            z_indices, y_indices, x_indices = mask_dict[mask_id]
+            print(f'Mask ID {mask_id} found in the mask coord dictionary.')
+        else:
+            z_indices, y_indices, x_indices = np.where(labels_layer.data == mask_id)
+            print(f"Mask ID {mask_id} not found in the mask dictionary. Using the labels layer instead.")
     else:
         z_indices, y_indices, x_indices = np.where(labels_layer.data == mask_id)
-        print(f"Mask ID {mask_id} not found in the mask dictionary. Using the labels layer instead.")
 
     if len(z_indices) == 0:
         print(f"Mask ID {mask_id} has no coordinates.")
@@ -69,12 +72,15 @@ def center_on_mask(labels_layer, mask_id):
     )
     
     # Update the dictionary with the centroid
-    if mask_id in sdict:
+    print(f"Updating mask {mask_id} with centroid {centroid}")
+    print(f"Mask ID in sdict.keys(): {mask_id in sdict.keys()}")
+
+    if mask_id in sdict.keys(): # TODO: Something is wrong here, the mask_id is never in the dictionary
         sdict[(mask_id)]["centroid"] = centroid
+        print(f"Updated mask {mask_id} with centroid {centroid}")
     else:
-        # TODO: For some reason, the Mask ID is never in the dictionary after filtering by label, fix this?
         print(f"Mask ID {mask_id} not found in the mask (json) dictionary, creating a new entry.")
-        sdict[(mask_id)] = {"ctype": "unknown", "centroid": centroid}
+        sdict[(mask_id)] = {"ctype": "unknown", "centroid": centroid}      
 
     # Center viewer on the mask
     viewer.dims.set_point(0, centroid[2])
@@ -124,7 +130,7 @@ def jump_to_mask():
         print("Please enter a valid integer for the Mask ID.")
 
 # Function to assign the cell type to the current mask
-@magicgui(call_button="Assign Cell Type", cell_type={"choices": ["megakaryocytic", "negative", "unknown"]})
+@magicgui(call_button="Assign Cell Type", cell_type={"choices": ["positive", "negative", "unknown"]}) # "megakaryocytic" changed to "positive"
 def assign_cell_type(cell_type: str):
     global current_mask_idx, mask_ids, sdict, id_current
     mask_id = id_current
@@ -134,9 +140,9 @@ def assign_cell_type(cell_type: str):
         next_mask()  # Automatically move to the next mask
 
 # Function to filter masks by label
-@magicgui(call_button="Filter Masks by Label", label={"choices": ["negative", "megakaryocytic", "unknown"]})
+@magicgui(call_button="Filter Masks by Label", label={"choices": ["negative", "positive", "unknown"]}) # "megakaryocytic" changed to "positive"
 def filter_masks_by_label(label="unknown"):
-    global filtered_mask_ids, selected_label, current_filtered_idx
+    global filtered_mask_ids, selected_label, current_filtered_idx, sdict
     selected_label = label
 
     # Find masks with the selected label
@@ -146,22 +152,6 @@ def filter_masks_by_label(label="unknown"):
     current_filtered_idx = -1  # Reset index
     print(f"Filtered {len(filtered_mask_ids)} masks with label '{selected_label}'.")
     print(f'The filtered mask ids are: {filtered_mask_ids}')
-
-# Function to go to the next mask with the selected label
-# def next_filtered_mask(event=None):
-#     global current_filtered_idx, filtered_mask_ids
-#     if len(filtered_mask_ids) > 0:
-
-#         current_filtered_idx += 1 # Increment index
-#         current_filtered_idx %= len(filtered_mask_ids) # Loop back to the first mask
-
-#         mask_id = filtered_mask_ids[current_filtered_idx]
-
-#         print('Going to mask id:', mask_id)
-
-#         center_on_mask(select_labels_layer.labels_layer.value, mask_id)
-#     else:
-#         print("No masks found with the selected label.")
 
 # Modify the function to jump to the next filtered mask
 def next_filtered_mask(event=None):
@@ -178,18 +168,6 @@ def next_filtered_mask(event=None):
     else:
         print("No masks found with the selected label.")
 
-# Function to go to the previous mask with the selected label
-# def previous_filtered_mask(event=None):
-#     global current_filtered_idx, filtered_mask_ids
-#     if len(filtered_mask_ids) > 0:
-#         current_filtered_idx = (current_filtered_idx - 1) % len(filtered_mask_ids)
-#         mask_id = filtered_mask_ids[current_filtered_idx]
-
-
-#         center_on_mask(select_labels_layer.labels_layer.value, mask_id)
-#     else:
-#         print("No masks found with the selected label.")
-# Modify the function to jump to the next filtered mask
 def previous_filtered_mask(event=None):
     global current_filtered_idx, filtered_mask_ids
     if len(filtered_mask_ids) > 0:
@@ -203,7 +181,6 @@ def previous_filtered_mask(event=None):
         jump_to_mask()  # Use the jump function instead of next_mask to move directly
     else:
         print("No masks found with the selected label.")
-
 
 # Function to save the mask dictionary to a JSON file
 def save_mask_dict():
@@ -237,7 +214,7 @@ def load_mask_dict():
 def load_mask_dict_jump():
 # This widget uses files generated by the script found at:
 # 'https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py'.
-    global mask_dict
+    global mask_dict, loaded_mask_dict
     file_dialog = QFileDialog()
     file_path, _ = file_dialog.getOpenFileName(caption="Select Mask Dictionary File", filter="Pickle Files (*.pkl)")
     
@@ -245,6 +222,7 @@ def load_mask_dict_jump():
         with open(file_path, 'rb') as file:
             mask_dict = pickle.load(file)
         print(f"Mask dictionary (for moving to next mask) loaded from {file_path}.pkl, length is {len(mask_dict)}")
+        loaded_mask_dict = True
     else:
         print("No file selected.")
 
