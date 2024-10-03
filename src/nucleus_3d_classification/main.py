@@ -362,14 +362,14 @@ def define_callbacks(args, callback_names: list):
                 try:
                     args.swa_args = convert_types(extract_arguments(args.swa_args))
                     swa_lrs = args.swa_args.get('swa_lrs', 1e-4)
-                    swa_epoch_start = args.swa_args.get('swa_epoch_start', 10)
-                    annealing_epochs = args.swa_args.get('annealing_epochs', 10)
+                    swa_epoch_start = args.swa_args.get('swa_epoch_start', 1)
+                    annealing_epochs = args.swa_args.get('annealing_epochs', 1)
                     annealing_strategy = args.swa_args.get('annealing_strategy', 'cos')
                 except (ValueError, IndexError) as e:
                     print(f"Error parsing swa_args: {e}.")
                     swa_lrs = 1e-4
-                    swa_epoch_start = 10
-                    annealing_epochs = 10
+                    swa_epoch_start = 1
+                    annealing_epochs = 1
                     annealing_strategy = 'cos'
                 
                 # Log the chosen SWA parameters
@@ -419,8 +419,7 @@ def create_checkpoint_callback(args):
     # Dirpath -> check if exists, if not, create it
     create_dir_if_not_exists(args.dirpath)
 
-    return [
-    ModelCheckpoint(
+    return ModelCheckpoint(
         save_top_k=args.save_top_k,
         save_last=True, # Always saves last.ckpt
         save_on_train_epoch_end=False, # Save at end of validation
@@ -428,8 +427,7 @@ def create_checkpoint_callback(args):
         mode=args.mode,
         dirpath=args.dirpath,
         filename=args.filename # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
-        ),
-    ModelCheckpoint(
+        ), ModelCheckpoint(
         save_top_k=1,
         save_on_train_epoch_end=False,
         monitor='f1_score_val',
@@ -437,7 +435,6 @@ def create_checkpoint_callback(args):
         dirpath=args.dirpath,
         filename='best-f1_score-{epoch:02d}-{f1_score_val:.2f}'
         )
-    ]
 
 def replace_filename(args):
     filename = args.filename
@@ -529,20 +526,25 @@ def load_data_module(args):
         raise ValueError(f"Unknown data module: {args.data_module}")
     
     # Set up according to stage
-    match args.stage:
-        case "fit":
-            data_module.setup(stage="fit")
-        case "train":
-            data_module.setup(stage="fit") 
-        case "validate":
-            data_module.setup(stage="validate")
-        case "test":
-            data_module.setup(stage="test")
-        case "predict":
-            ...
-            data_module.setup(stage="predict")
-        case _:
-            data_module.setup()
+    if not hasattr(args, 'stage'):
+        data_module.setup()
+    else:
+        args.stage = args.stage.lower
+        match args.stage:
+            case "fit":
+                data_module.setup(stage="fit")
+            case "train":
+                data_module.setup(stage="fit") 
+            case "validate":
+                data_module.setup(stage="validate")
+            case "test":
+                data_module.setup(stage="test")
+            case "predict":
+                ...
+                data_module.setup(stage="predict")
+            case _:
+                data_module.setup()
+    # data_module.setup()
     return data_module
 
 def train_nn_model(args):
