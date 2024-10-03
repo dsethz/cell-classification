@@ -50,37 +50,59 @@ class pad(torch.nn.Module):
         return padded_tensor
 
 
-class scale:
+class scale(torch.nn.Module):
     def __init__(self, min_val, max_val):
+        """
+        Initializes the Scale module.
+
+        Args:
+            min_val (float): Minimum value for scaling.
+            max_val (float): Maximum value for scaling.
+        """
+        super().__init__()
         self.min_val = min_val
         self.max_val = max_val
 
-    def __call__(self, img):
+    def forward(self, img):
+        '''
+        Scales the input image intensities to the specified range.
+        '''
         img = (img - img.min()) / (img.max() - img.min())
         img = img * (self.max_val - self.min_val) + self.min_val
         return img
     
 # Custom transformation to normalize the image intensities
 
-class normalize:
+class normalize(torch.nn.Module):
     def __init__(self, mean, std):
+        """
+        Initializes the Normalize module.
+
+        Args:
+            mean (float): Mean value for normalization.
+            std (float): Standard deviation value for normalization.
+        """
+        super().__init__()
         self.mean = mean
         self.std = std
-
-    def __call__(self, img):
+    
+    def forward(self, img):
         img = (img - self.mean) / self.std
         return img
-class ZDepthTransform: # TODO: Test this
-    def __init__(self, rotate_prob=0.5, invert_prob=0.5):
+class rotate_invert(torch.nn.Module): 
+    def __init__(self, rotate_prob=0, invert_z_prob=0.5, invert_x_prob=0.5, invert_y_prob=0.5):
         """
         Args:
             rotate_prob (float): Probability of applying rotation along the z-axis.
             invert_prob (float): Probability of applying inversion along the z-axis.
         """
+        super().__init__()
         self.rotate_prob = rotate_prob
-        self.invert_prob = invert_prob
+        self.invert_z_prob = invert_z_prob
+        self.invert_x_prob = invert_x_prob
+        self.invert_y_prob = invert_y_prob
 
-    def __call__(self, image):
+    def forward(self, image):
         """
         Apply the transformations to the 3D image.
         
@@ -94,12 +116,19 @@ class ZDepthTransform: # TODO: Test this
         assert image.dim() == 3, "Input image must be 3D (D, H, W)"
 
         # Optionally rotate along the z-axis (depth)
-        if random.random() < self.rotate_prob:
-            image = self.rotate_along_z(image)
+        #if random.random() < self.rotate_prob:
+        #    image = self.rotate_along_z(image)
+        # TODO: Ask if rotations should be included, as we have unequal dimensions! 34,164,174
 
         # Optionally invert along the z-axis (depth)
-        if random.random() < self.invert_prob:
+        if random.random() < self.invert_z_prob:
             image = self.invert_z(image)
+
+        if random.random() < self.invert_x_prob:
+            image = self.invert_x(image)
+
+        if random.random() < self.invert_y_prob:
+            image = self.invert_y(image)
 
         return image
 
@@ -113,7 +142,8 @@ class ZDepthTransform: # TODO: Test this
         Returns:
             Tensor: Rotated 3D image.
         """
-        rotations = random.choice([0, 1, 2, 3])  # Randomly rotate 0, 90, 180, or 270 degrees
+        rotations = random.choice([1,2,3])  # Randomly rotate 90, 180, or 270 degrees
+        # print('Image is rotated by', rotations*90, 'degrees')
         return torch.rot90(image, rotations, dims=[1, 2])
 
     def invert_z(self, image):
@@ -126,5 +156,32 @@ class ZDepthTransform: # TODO: Test this
         Returns:
             Tensor: Inverted 3D image.
         """
+        
+        #print('Image is inverted along the z-axis')
         return torch.flip(image, dims=[0])  # Invert along the depth (z-axis)
-
+    
+    def invert_x(self, image):
+        """
+        Invert the image along the x axis.
+        
+        Args:
+            image (Tensor): 3D image tensor of shape (D, H, W).
+        
+        Returns:
+            Tensor: Inverted 3D image (in x).
+        """
+        
+        return torch.flip(image, dims=[2])
+    
+    def invert_y(self, image):
+        """
+        Invert the image along the y axis.
+        
+        Args:
+            image (Tensor): 3D image tensor of shape (D, H, W).
+        
+        Returns:
+            Tensor: Inverted 3D image (in y).
+        """
+        
+        return torch.flip(image, dims=[1])

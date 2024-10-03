@@ -8,15 +8,8 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset
 import tifffile as tiff
 from torchvision import transforms
 
-from utils.transform import scale, normalize, pad
+from utils.transform import scale, normalize, pad, rotate_invert
 import lightning as L
-
-#DEBUG
-# Debugging high mem usage
-from torch.profiler import profile, record_function, ProfilerActivity
-import socket
-import logging
-from datetime import datetime, timedelta
 
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, label_file, crop_dir, target_size=[34,164,174]):
@@ -26,9 +19,10 @@ class CustomDataset(torch.utils.data.Dataset):
         self.target_size = target_size
 
         self.transform = transforms.Compose([
-            pad(self.target_size)# ,
-            # scale(0, 1),
-            # normalize(0.5, 0.5)
+            rotate_invert(rotate_prob = 0, invert_z_prob = .5, invert_x_prob = .5, invert_y_prob = .5),
+            pad(self.target_size),
+            scale(0, 1),
+            normalize(0.5, 0.5)
         ])
         
         self.files = [file for file in os.listdir(self.crop_dir) if file.endswith('.tif')]
@@ -144,6 +138,9 @@ class CustomDataModule(L.LightningDataModule):
             self.validation_data = create_combined_dataset(self.validation_data_names, self.target_size)
         if stage == 'test' or stage is None:
             self.test_data = create_combined_dataset(self.test_data_names, self.target_size)
+        if stage == 'predict':
+            # TODO: Change to predict data later on.
+            self.test_data = create_combined_dataset(self.test_data_names, self.target_size)
     
     def train_dataloader(self):
         return DataLoader(self.training_data, batch_size=self.batch_size, num_workers=self.num_workers)
@@ -152,6 +149,10 @@ class CustomDataModule(L.LightningDataModule):
         return DataLoader(self.validation_data, batch_size=self.batch_size, num_workers=self.num_workers)
     
     def test_dataloader(self):
+        return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers)
+    
+    def predict_dataloader(self):
+        # TODO: Change to predict data later on.
         return DataLoader(self.test_data, batch_size=self.batch_size, num_workers=self.num_workers)
 
     def teardown(self, stage: str) -> None:
@@ -165,6 +166,10 @@ class CustomDataModule(L.LightningDataModule):
     
     def test_dataset(self):
         return self.test_data    
+    
+    def predict_dataset(self):
+        # TODO: Change to predict data later on.
+        return self.test_data
     
 def create_combined_dataset(data_list, target_size):
     """Helper function to create and combine datasets."""
@@ -209,29 +214,29 @@ def main():
     # data_module.prepare_data()
     # data_module.setup()
 
-    # Prepare data and loaders with enhanced memory profiling
-    with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
-                 profile_memory=True, 
-                 record_shapes=True, 
-                 with_stack=True) as prof:
-        with record_function("datamodule_prep"):
-            data_module.prepare_data()
-            data_module.setup()
+    # # Prepare data and loaders with enhanced memory profiling
+    # with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], 
+    #              profile_memory=True, 
+    #              record_shapes=True, 
+    #              with_stack=True) as prof:
+    #     with record_function("datamodule_prep"):
+    #         data_module.prepare_data()
+    #         data_module.setup()
     
     # Print more detailed memory profiling information
-    print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
-    print(prof.key_averages(group_by_input_shape=True).table(sort_by="self_cpu_memory_usage", row_limit=10))
+    # print(prof.key_averages().table(sort_by="self_cpu_memory_usage", row_limit=10))
+    # print(prof.key_averages(group_by_input_shape=True).table(sort_by="self_cpu_memory_usage", row_limit=10))
 
-    # Get the train, validation, and test loaders
-    train_loader = data_module.train_dataloader()
-    val_loader = data_module.val_dataloader()
-    test_loader = data_module.test_dataloader()
+    # # Get the train, validation, and test loaders
+    # train_loader = data_module.train_dataloader()
+    # val_loader = data_module.val_dataloader()
+    # test_loader = data_module.test_dataloader()
 
-    # Sanity check, print the first batch of images and labels using the show_slice function
-    images, labels = next(iter(train_loader))
+    # # Sanity check, print the first batch of images and labels using the show_slice function
+    # images, labels = next(iter(train_loader))
 
-    print(images.shape)
-    print(labels.shape)
+    # print(images.shape)
+    # print(labels.shape)
 
 if __name__ == '__main__':
     main()
