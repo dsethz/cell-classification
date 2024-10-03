@@ -511,27 +511,26 @@ def load_data_module(args):
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
     
-    # Set up according to stage
     if not hasattr(args, 'stage'):
         data_module.setup()
     else:
-        args.stage = args.stage.lower
-        match args.stage:
-            case "fit":
-                data_module.setup(stage="fit")
-            case "train":
-                data_module.setup(stage="fit") 
-            case "validate":
-                data_module.setup(stage="validate")
-            case "test":
-                data_module.setup(stage="test")
-            case "predict":
-                ...
-                data_module.setup(stage="predict")
-            case _:
-                data_module.setup()
-    # data_module.setup()
+        args.stage = args.stage.lower()
+        
+        if args.stage == "fit":
+            data_module.setup(stage="fit")
+        elif args.stage == "train":
+            data_module.setup(stage="fit")
+        elif args.stage == "validate":
+            data_module.setup(stage="validate")
+        elif args.stage == "test":
+            data_module.setup(stage="test")
+        elif args.stage == "predict":
+            data_module.setup(stage="predict")
+        else:
+            data_module.setup()
+    
     return data_module
+
 
 def train_nn_model(args):
     data_module = load_data_module(args)
