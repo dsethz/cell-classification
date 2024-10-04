@@ -76,7 +76,7 @@ For NN models, the following options are available:
 --swa_args swa_lrs=3e-4 swa_epoch_start=15 annealing_epochs=10 annealing_strategy=cos
 --swa_args swa_lrs=float swa_epoch_start=int annealing_epochs=int annealing_strategy=str
 
-# LRF args (--lrf_args) example:    
+# LRF args (--lrf_args) example:
 --lrf_args min_lr=1e-6 max_lr=1e-1 num_training_steps=100 mode=cos milestones=[0, 1]
 --lrf_args min_lr=float max_lr=float num_training_steps=int mode=str milestones=[int, int, int]
 """
@@ -119,10 +119,10 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 # import tensorboard
 '''
-NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented 
-for the MPS device. If you want this op to be added in priority during the prototype phase of this feature, 
-please comment on https://github.com/pytorch/pytorch/issues/77764. As a temporary fix, you can set the environment 
-variable `PYTORCH_ENABLE_MPS_FALLBACK=1` to use the CPU as a fallback for this op. WARNING: this will be slower than 
+NotImplementedError: The operator 'aten::max_pool3d_with_indices' is not currently implemented
+for the MPS device. If you want this op to be added in priority during the prototype phase of this feature,
+please comment on https://github.com/pytorch/pytorch/issues/77764. As a temporary fix, you can set the environment
+variable `PYTORCH_ENABLE_MPS_FALLBACK=1` to use the CPU as a fallback for this op. WARNING: this will be slower than
 running natively on MPS.
 
 Before running use terminal command:
@@ -133,7 +133,7 @@ Otherwise maxpool will not work on MPS device
 
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
-        
+
         if not isinstance(model, BaseEstimator):
             raise ValueError("Model must be a scikit-learn estimator")
 
@@ -203,7 +203,7 @@ def get_nn_model_class(model_name: str):
             ceil_mode = True
             model = model(num_classes=num_classes, image_channels=image_channels, padding_layer_sizes=padding_layer_sizes, ceil_mode=ceil_mode)
         return model.__class__
-    
+
     return model
 
 def load_data(data_dir: str, data_file: str, target: str = 'label'):
@@ -230,7 +230,7 @@ def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
     if remove_label and 'label' in data.columns:
         print("Warning: 'label' column found in prediction data. Removing it by default.\nIf you want to keep the 'label' column, use the --remove_label flag.")
         data = data.drop(columns=['label'])
-    
+
     return data
 
 def train_sklearn_model(model, X, y, save_name: str, save_dir: str = "./models"):
@@ -248,15 +248,15 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
     y = model.predict(X)
     create_dir_if_not_exists(save_dir)
     save_path = os.path.join(save_dir, f"{save_name}.{save_type}")
-    
+
     if save_type == 'csv':
         pd.DataFrame(y).to_csv(save_path, index=False)
     elif save_type == 'pkl':
         with open(save_path, 'wb') as f:
             pickle.dump(y, f)
-            
+
     print(f"Predictions saved to {save_path} as {save_type}")
-    
+
     return y
 
 def extract_arguments(text):
@@ -268,10 +268,10 @@ def extract_arguments(text):
     # Regular expression to match key=value pairs
     pattern = r"(\w+)=([0-9e\-.]+|\w+|\[[0-9, ]+\])"
     matches = re.findall(pattern, text)
-    
+
     # Convert matches to a dictionary
     arguments = {key: value for key, value in matches}
-    
+
     return arguments
 
 def convert_types(arguments):
@@ -279,7 +279,7 @@ def convert_types(arguments):
         if value.startswith('[') and value.endswith(']'):
             # Convert string list to actual list
             try:
-                arguments[key] = list(map(int, value[1:-1].split(','))) 
+                arguments[key] = list(map(int, value[1:-1].split(',')))
                 # Convert to list of integers, assuming all values are integers, otherwise print error
             except ValueError:
                 print(f"Error converting {key} to list of integers, with values: {value}")
@@ -341,7 +341,7 @@ def define_callbacks(args, callback_names: list):
                 num_training_steps = 100
                 mode = 'cos'
                 milestones = [0, 1]
-            
+
             print(f"Using LRF parameters: "
                     f"min_lr={min_lr}, "
                     f"max_lr={max_lr}, "
@@ -362,35 +362,35 @@ def define_callbacks(args, callback_names: list):
                 try:
                     args.swa_args = convert_types(extract_arguments(args.swa_args))
                     swa_lrs = args.swa_args.get('swa_lrs', 1e-4)
-                    swa_epoch_start = args.swa_args.get('swa_epoch_start', 10)
-                    annealing_epochs = args.swa_args.get('annealing_epochs', 10)
+                    swa_epoch_start = args.swa_args.get('swa_epoch_start', 1)
+                    annealing_epochs = args.swa_args.get('annealing_epochs', 1)
                     annealing_strategy = args.swa_args.get('annealing_strategy', 'cos')
                 except (ValueError, IndexError) as e:
                     print(f"Error parsing swa_args: {e}.")
                     swa_lrs = 1e-4
-                    swa_epoch_start = 10
-                    annealing_epochs = 10
+                    swa_epoch_start = 1
+                    annealing_epochs = 1
                     annealing_strategy = 'cos'
-                
+
                 # Log the chosen SWA parameters
                 print(f"Using SWA parameters: "
                       f"swa_lrs={swa_lrs}, "
                       f"swa_epoch_start={swa_epoch_start}, "
                       f"annealing_epochs={annealing_epochs}, "
                       f"annealing_strategy={annealing_strategy}")
-                
+
                 # Append the SWA callback with the parsed (or default) parameters
                 callbacks.append(StochasticWeightAveraging(
-                    swa_lrs=swa_lrs, 
-                    swa_epoch_start=swa_epoch_start, 
-                    annealing_epochs=annealing_epochs, 
+                    swa_lrs=swa_lrs,
+                    swa_epoch_start=swa_epoch_start,
+                    annealing_epochs=annealing_epochs,
                     annealing_strategy=annealing_strategy
                 ))
 
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback)
-
+        callbacks.append(ModelCheckpoint(save_top_k=1, save_on_train_epoch_end=False,monitor='f1_score_val',mode=args.mode,dirpath=args.dirpath,filename='best-f1_score-{epoch:02d}-{f1_score_val:.2f}'))
     return callbacks
 
 class FineTuneLearningRateFinder(LearningRateFinder):
@@ -419,25 +419,8 @@ def create_checkpoint_callback(args):
     # Dirpath -> check if exists, if not, create it
     create_dir_if_not_exists(args.dirpath)
 
-    return [
-    ModelCheckpoint(
-        save_top_k=args.save_top_k,
-        save_last=True, # Always saves last.ckpt
-        save_on_train_epoch_end=False, # Save at end of validation
-        monitor=args.monitor,
-        mode=args.mode,
-        dirpath=args.dirpath,
-        filename=args.filename # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
-        ),
-    ModelCheckpoint(
-        save_top_k=1,
-        save_on_train_epoch_end=False,
-        monitor='f1_score_val',
-        mode=args.mode,
-        dirpath=args.dirpath,
-        filename='best-f1_score-{epoch:02d}-{f1_score_val:.2f}'
-        )
-    ]
+    return ModelCheckpoint(save_top_k=args.save_top_k, save_last=True, save_on_train_epoch_end=False, monitor=args.monitor, mode=args.mode, dirpath=args.dirpath, filename=args.filename)
+    # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
 
 def replace_filename(args):
     filename = args.filename
@@ -447,7 +430,7 @@ def replace_filename(args):
     filename = filename.replace("val_loss", "{val_loss:.2f}")
 
     filename = clean_filename(filename)
-    
+
     return filename
 
 def clean_filename(filename):
@@ -501,7 +484,7 @@ def load_data_module(args):
             data_module = BaseDataModule(data_dir="./data", batch_size=32)
         else:
             data_module = BaseDataModule(data_dir="./data", batch_size=args.batch_size)
-    
+
     elif args.data_module == "CustomDataModule":
         if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO remove this logic later
             try:
@@ -527,23 +510,25 @@ def load_data_module(args):
         data_module = CustomDataModule(setup_file=setup_file, batch_size=args.batch_size, num_workers=args.num_workers)
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
-    
-    # Set up according to stage
-    match args.stage:
-        case "fit":
+
+    if not hasattr(args, 'stage'):
+        data_module.setup()
+    else:
+        args.stage = args.stage.lower()
+
+        if args.stage == "fit" or args.stage == "train":
             data_module.setup(stage="fit")
-        case "train":
-            data_module.setup(stage="fit") 
-        case "validate":
+        elif args.stage == "validate":
             data_module.setup(stage="validate")
-        case "test":
+        elif args.stage == "test":
             data_module.setup(stage="test")
-        case "predict":
-            ...
+        elif args.stage == "predict":
             data_module.setup(stage="predict")
-        case _:
+        else:
             data_module.setup()
+
     return data_module
+
 
 def train_nn_model(args):
     data_module = load_data_module(args)
@@ -675,7 +660,7 @@ def predict_nn_model(args):
         os.path.join(args.model_dir, f"{args.model_file}"),
         os.path.join(args.model_dir, f"{args.model_file}.ckpt")
     ]
-    
+
     model = None
 
     # Attempt to load the model from each path
@@ -687,7 +672,7 @@ def predict_nn_model(args):
             break
         except FileNotFoundError:
             print(f"Model file not found at {model_path}, trying next option...")
-    
+
     # If none of the paths worked, raise an error
     if model is None:
         raise FileNotFoundError(f"Model file not found. Tried the following paths: {model_paths}")
@@ -718,13 +703,13 @@ def save_predictions(predictions, args):
     elif args.save_type == 'pkl':
         with open(save_path, 'wb') as f:
             pickle.dump(predictions, f)
-    
+
     print(f"Predictions saved to {save_path}")
 
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
-    
+
     # First level: model type
     subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
 
@@ -794,12 +779,12 @@ def parse_arguments():
     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
     nn_predict_parser.add_argument("--stage", type=str, default="predict", choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
-    
+
     # Scikit-learn parsers (logreg and rf)
     for model_type in ['logreg', 'rf']:
         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
         model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
-        
+
         # Train parser
         train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
         train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
@@ -808,10 +793,10 @@ def parse_arguments():
         train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
         train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
         train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
-        
+
         if model_type == "logreg":
             train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
-        
+
         # Predict parser
         predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
         predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
@@ -850,7 +835,6 @@ def get_extra_args(args, loss_fn):
                 'image_channels': args.image_channels,
                 'padding_layer_sizes': args.padding_layer_sizes,
                 'layers': args.layers,
-                'padding_layer_sizes': args.padding_layer_sizes,
                 'loss_fn': loss_fn,
                 'learning_rate': args.learning_rate
                 }
@@ -858,7 +842,7 @@ def get_extra_args(args, loss_fn):
 
 def main():
     args = parse_arguments()
-    
+
     # NN Branch
     if args.model_type == "nn":
         if args.command == "train":
@@ -883,7 +867,7 @@ def main():
             model = get_model(args.model_type, class_weight=args.class_weight, max_iter=args.max_iter)
             X, y = load_data(args.data_dir, args.data, target=args.target)
             train_sklearn_model(model, X, y, args.save_name, save_dir=args.save_dir)
-        
+
         # Predict sub-branch
         elif args.command == "predict":
             model_path = os.path.join(args.model_dir, f"{args.model_file}.pkl")
