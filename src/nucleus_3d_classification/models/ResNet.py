@@ -77,15 +77,7 @@ class ResNet(L.LightningModule):
         self.gamma = gamma
 
         # Initialize TP, FP, TN, FN counters
-        self.tp = 0
-        self.fp = 0
-        self.tn = 0
-        self.fn = 0
-
-        self.val_tp=0
-        self.val_fp=0
-        self.val_tn=0
-        self.val_fn=0
+        self.tp = self.fp = self.tn = self.fn = 0
 
         # Save Hyperparameters
         self.save_hyperparameters()
@@ -135,6 +127,13 @@ class ResNet(L.LightningModule):
             elif isinstance(m, nn.BatchNorm3d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
+    def update_metrics(self, y_hat, y):
+        pred = torch.argmax(y_hat, dim=1)
+        self.tp += torch.sum((pred == 1) & (y == 1)).item()
+        self.fp += torch.sum((pred == 1) & (y == 0)).item()
+        self.tn += torch.sum((pred == 0) & (y == 0)).item()
+        self.fn += torch.sum((pred == 0) & (y == 1)).item()
 
     def forward(self, x):
         #print(f"Input shape: {x.shape}")
@@ -189,6 +188,10 @@ class ResNet(L.LightningModule):
         x, y = batch
         y_hat = self.forward(x)
         loss = loss_fn(y_hat, y)
+
+        # Update metric counters
+        self.update_metrics(y_hat, y)
+
         self.log('training_loss', loss, sync_dist=True)
         return loss
     
@@ -198,54 +201,48 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
-        y_pred_class = torch.argmax(y_hat, dim=1)        
-        # Flatten tensors for comparison if they have extra dimensions
-        y = y.view(-1)
-        predicted_classes = y_pred_class.view(-1)
-
-        # Calculate TP, FP, TN, FN
-        self.val_tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
-        self.val_fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
-        self.val_tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
-        self.val_fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
-                # Optional: print for debugging purposes
-        #print(f"Predicted: {predicted_classes}, True: {y}")
-        #self.log('val_loss', val_loss,sync_dist=True)
-
-        # # Calculate accuracy, precision, recall
-        #     # convert to probabilities
-        # y_pred_proba = torch.softmax(y_hat, dim=1)
-        # acc = self.accuracy(y_hat, y)
+        # Update metric counters
+        self.update_metrics(y_hat, y)
 
         values = {"val_loss": val_loss}
         self.log_dict(values, on_epoch=True, prog_bar=True, sync_dist=True) # Sync dist is used for distributed training
 
         return val_loss
 
+    def on_train_epoch_end(self):
+        self.log_metrics('train')
+        self.reset_metrics()
+
     def on_validation_epoch_end(self):
+        self.log_metrics('val')
+        self.reset_metrics()
 
-        # Calculate accuracy, precision, recall, etc.
-        total_val = self.val_tp + self.val_fp + self.val_tn + self.val_fn
-        accuracy_val = (self.val_tp + self.val_tn) / total_val if total_val > 0 else 0
-        precision_val = self.val_tp / (self.val_tp + self.val_fp) if (self.val_tp + self.val_fp) > 0 else 0
-        recall_val = self.val_tp / (self.val_tp + self.val_fn) if (self.val_tp + self.val_fn) > 0 else 0
-        f1_score_val = 2 * (precision_val * recall_val) / (precision_val + recall_val) if (precision_val + recall_val) > 0 else 0
+    def on_test_epoch_end(self):
+        self.log_metrics('test')
+        self.reset_metrics()
 
-        # Log or print your metrics
-        self.log('val_accuracy', accuracy_val, on_epoch=True, sync_dist=True)
-        self.log('precision_val', precision_val, on_epoch=True, sync_dist=True)
-        self.log('recall_val', recall_val, on_epoch=True, sync_dist=True)
-        self.log('f1_score_val', f1_score_val, on_epoch=True, sync_dist=True)
+    def log_metrics(self, prefix):
+        total = self.tp + self.tn + self.fp + self.fn
+        accuracy = (self.tp + self.tn) / total if total > 0 else 0
+        precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
+        recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
-        self.log('tp_val', self.val_tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('fp_val', self.val_fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('tn_val', self.val_tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('fn_val', self.val_fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('total_val', total_val, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
+        self.log(f'{prefix}_tp', self.tp, on_epoch=True)
+        self.log(f'{prefix}_tn', self.tn, on_epoch=True)
+        self.log(f'{prefix}_fp', self.fp, on_epoch=True)
+        self.log(f'{prefix}_fn', self.fn, on_epoch=True)
+        self.log(f'{prefix}_accuracy', accuracy, on_epoch=True)
+        self.log(f'{prefix}_precision', precision, on_epoch=True)
+        self.log(f'{prefix}_recall', recall, on_epoch=True)
+        self.log(f'{prefix}_f1', f1, on_epoch=True)
 
-        # Print for debugging
-        print(f"Validation Accuracy: {accuracy_val}, Validation Precision: {precision_val}, Validation Recall: {recall_val}, Validation F1 Score: {f1_score_val}")
-    
+        print(f"{prefix.capitalize()} Metrics - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
+        print(f"{prefix.capitalize()} Counts - TP: {self.tp}, TN: {self.tn}, FP: {self.fp}, FN: {self.fn}")
+
+    def reset_metrics(self):
+        self.tp = self.fp = self.tn = self.fn = 0
+
     def test_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
 
@@ -253,50 +250,13 @@ class ResNet(L.LightningModule):
         y_hat = self.forward(x)
         Test_step_loss = loss_fn(y_hat, y)
 
-        # Apply softmax to get probabilities
-        #y_pred_proba = torch.softmax(y_hat, dim=1)
-        
-        # Get predicted class
-        y_pred_class = torch.argmax(y_hat, dim=1)
+        # Update metric counters
+        self.update_metrics(y_hat, y)
 
-        # Flatten tensors for comparison if they have extra dimensions
-        y = y.view(-1)
-        predicted_classes = y_pred_class.view(-1)
-
-        # Calculate TP, FP, TN, FN
-        self.tp += torch.sum((y == 1) & (predicted_classes == 1)).item()
-        self.fp += torch.sum((y == 0) & (predicted_classes == 1)).item()
-        self.tn += torch.sum((y == 0) & (predicted_classes == 0)).item()
-        self.fn += torch.sum((y == 1) & (predicted_classes == 0)).item()
-                # Optional: print for debugging purposes
-        #print(f"Predicted: {predicted_classes}, True: {y}")
+        self.log('test_loss', Test_step_loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return Test_step_loss
-    
-    def on_test_epoch_end(self):
-        # Calculate accuracy, precision, recall, etc.
-        total = self.tp + self.fp + self.tn + self.fn
-        accuracy = (self.tp + self.tn) / total if total > 0 else 0
-        precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
-        recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
-        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
-        # Log or print your metrics
-        self.log('test_accuracy', accuracy, on_epoch=True, sync_dist=True)
-        self.log('test_precision', precision, on_epoch=True, sync_dist=True)
-        self.log('test_recall', recall, on_epoch=True, sync_dist=True)
-        self.log('test_f1_score', f1_score, on_epoch=True, sync_dist=True)
-
-        self.log('tp', self.tp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('fp', self.fp, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('tn', self.tn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('fn', self.fn, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-        self.log('total', total, on_epoch=True, sync_dist=True, reduce_fx=torch.sum)
-
-        # Print for debugging
-        print(f"Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}, F1 Score: {f1_score}")
-
-    
     def predict_step(self, x):
         # TODO: Check this out
         x = self.forward(x)
@@ -392,10 +352,7 @@ class testNet(L.LightningModule):
         self.gamma = gamma
 
         # Initialize TP, FP, TN, FN counters
-        self.tp = 0
-        self.fp = 0
-        self.tn = 0
-        self.fn = 0
+        self.tp = self.fp = self.tn = self.fn = 0
 
         self.val_tp=0
         self.val_fp=0
@@ -442,6 +399,13 @@ class testNet(L.LightningModule):
             elif isinstance(m, nn.BatchNorm3d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
+
+    def update_metrics(self, y_hat, y):
+        pred = torch.argmax(y_hat, dim=1)
+        self.tp += torch.sum((pred == 1) & (y == 1)).item()
+        self.fp += torch.sum((pred == 1) & (y == 0)).item()
+        self.tn += torch.sum((pred == 0) & (y == 0)).item()
+        self.fn += torch.sum((pred == 0) & (y == 1)).item()
 
     def forward(self, x):
         #print(f"Input shape: {x.shape}")
