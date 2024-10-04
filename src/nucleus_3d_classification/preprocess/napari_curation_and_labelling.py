@@ -1,4 +1,4 @@
-# Mask Coord Dict is a dictionary that stores the coordinates of the masks in the labels layer, 
+# Mask Coord Dict is a dictionary that stores the coordinates of the masks in the labels layer,
 # generated from 'generate_mask_coord_dict.py', found at:
 # 'https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py'.
 # This file is not required, but it greatly improves the efficiency of the curation process by
@@ -7,14 +7,22 @@
 # Mask Dictionary is a dictionary that stores the cell type (under 'ctype') and centroid of each mask.
 # The cell type is assigned by the user, and the centroid is calculated from the mask coordinates (from the pickle dictionary file, if provided!).
 
+import json
+import os
+import pickle
+
 import napari
 import numpy as np
-from magicgui import magicgui
-from qtpy.QtWidgets import QPushButton, QVBoxLayout, QWidget, QLabel, QFileDialog, QLineEdit
-import json
-import pickle
-import os
 import tifffile
+from magicgui import magicgui
+from qtpy.QtWidgets import (
+    QFileDialog,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -31,34 +39,47 @@ selected_label = None
 loaded_mask_dict = False
 total_len = 0
 temp_path = None
+brush_size = 1
+loaded_labels_layer = None
+
+def update_brush_size(size):
+    """Update the brush size of the active labels layer."""
+    global brush_size, loaded_labels_layer
+    if loaded_labels_layer is not None:
+        brush_size = size
+        loaded_labels_layer.brush_size = brush_size
+        print(f"Brush size updated to {size}")
 
 # Save the mask_array every time next mask is called
 def save_mask_array(labels_layer):
     global temp_path, loaded_mask_dict
     if loaded_mask_dict:
         head, _ = os.path.split(temp_path)
-        #print(head)
         mask_array_path = head + '/temp_mask_array.tif'
         # Saving takes up a lot of time, need to find better alternative.
-        #print(f"Saving mask array to {mask_array_path}")
         tifffile.imwrite(mask_array_path, labels_layer.data, compression=('zlib', 1))
-        #print(f"Mask array saved to {mask_array_path}")
+        print(f"Mask array saved to {mask_array_path}")
 
 # Function to select the labels layer
 @magicgui(call_button="Select Labels Layer", labels_layer={"choices": []})
 def select_labels_layer(labels_layer: napari.layers.Labels):
-    global mask_ids, current_mask_idx, sdict, total_len
+    global mask_ids, current_mask_idx, sdict, total_len, loaded_labels_layer
     mask_ids = []
     total_len = 0
     if labels_layer.data is not None:
-        for mask_id in np.unique(labels_layer.data):
-            if mask_id != 0:
-                mask_ids.append(int(mask_id))
-                total_len += 1
-                # Create a dictionary entry for the mask ID if it doesn't exist
-                if int(mask_id) not in sdict:
-                    sdict[int(mask_id)] = {"ctype": "unknown", "centroid": None}
+        loaded_labels_layer = labels_layer
+        unique_labels = np.unique(labels_layer.data)
 
+        # Remove 0 from the unique labels
+        unique_labels = unique_labels[unique_labels != 0]
+        total_len = len(unique_labels)
+        mask_ids = unique_labels.tolist()
+
+        # Create a dictionary entry for each mask ID
+        for mask_id in mask_ids:
+            sdict[mask_id] = {"ctype": "unknown", "centroid": None}
+
+    update_brush_size(brush_size)
     current_mask_idx = -1  # Reset index for curation
     print(f"Found {len(mask_ids)} mask(s) in the selected labels layer.")
 
@@ -72,7 +93,7 @@ def center_on_mask(labels_layer, mask_id):
         if mask_id in mask_dict:
             z_indices, y_indices, x_indices = mask_dict[mask_id]
             print(f'Mask ID {mask_id} found in the mask coord dictionary.')
-            
+
             # Save every idx%10
             if current_mask_idx % 10 == 0:
                 save_mask_array(labels_layer)
@@ -93,22 +114,28 @@ def center_on_mask(labels_layer, mask_id):
         int(np.mean(y_indices)),
         int(np.mean(z_indices))
     )
-    
+
     # Update the dictionary with the centroid
     #print(f"Updating mask {mask_id} with centroid {centroid}")
-    print(f"Mask ID in sdict.keys(): {mask_id in sdict.keys()}") # True, when not loading a json mask file, interesting.
+    # print(f"Mask ID in sdict.keys(): {mask_id in sdict.keys()}") # True, when not loading a json mask file, interesting.
 
-    if mask_id in sdict.keys(): # TODO: Something is wrong here, the mask_id is never in the dictionary
-        sdict[(mask_id)]["centroid"] = centroid
-        print(f"Updated mask {mask_id} with centroid {centroid}")
-    else:
-        print(f"Mask ID {mask_id} not found in the mask (json) dictionary, creating a new entry.")
-        sdict[(mask_id)] = {"ctype": "unknown", "centroid": centroid}      
+    # Update or create dictionary entry
+    if mask_id not in sdict:
+        sdict[mask_id] = {"ctype": "unknown", "centroid": None}
+        print(f"Created new entry for mask {mask_id} with centroid {centroid}, set ctype to unknown.")
+    sdict[mask_id]["centroid"] = centroid
+
+    # if mask_id in sdict.keys(): # TODO: Something is wrong here, the mask_id is never in the dictionary
+    #     sdict[(mask_id)]["centroid"] = centroid
+    #     print(f"Updated mask {mask_id} with centroid {centroid}")
+    # else:
+    #     print(f"Mask ID {mask_id} not found in the mask (json) dictionary, creating a new entry.")
+    #     sdict[(mask_id)] = {"ctype": "unknown", "centroid": centroid}
 
     # Center viewer on the mask
     viewer.dims.set_point(0, centroid[2])
     viewer.camera.center = (centroid[1], centroid[0])
-    viewer.camera.zoom = 7
+    viewer.camera.zoom = 8
 
     # Set the selected label in the labels layer to the current mask
     labels_layer.selected_label = mask_id
@@ -119,7 +146,7 @@ def center_on_mask(labels_layer, mask_id):
 # Function to move to the next mask
 def next_mask(event=None):
     global current_mask_idx
-    print(f"Current mask index: {current_mask_idx}/{total_len}")
+    print(f"Current mask index: {current_mask_idx + 1}/{total_len}")
     if current_mask_idx < len(mask_ids) - 1:
         current_mask_idx += 1
     else:
@@ -211,7 +238,7 @@ def save_mask_dict():
     global sdict
     file_dialog = QFileDialog()
     file_path, _ = file_dialog.getSaveFileName(caption="Save Mask Dictionary As", filter="JSON Files (*.json)")
-    
+
     if file_path:
         sdict_converted = {int(k): v for k, v in sdict.items()}
         with open(file_path, 'w') as file:
@@ -225,12 +252,13 @@ def load_mask_dict():
     global sdict
     file_dialog = QFileDialog()
     file_path, _ = file_dialog.getOpenFileName(caption="Load Mask Dictionary (JSON)", filter="JSON Files (*.json)")
-    
+
     if file_path:
         with open(file_path, 'r') as file:
             sdict = json.load(file)
         # Convert keys back to integers
         sdict = {int(k): v for k, v in sdict.items()}
+        print(sdict.keys(), sdict.values())
         print(f"Mask (cell type) dictionary loaded from {file_path}. Total masks: {len(sdict)}")
     else:
         print("Load operation canceled.")
@@ -308,8 +336,13 @@ viewer.window.add_dock_widget(mask_jump_widget, area='right')
 viewer.window.add_dock_widget(control_widget, area='right')
 
 # Bind hotkeys for next and previous mask
-viewer.bind_key('n', next_mask)
-viewer.bind_key('p', previous_mask)
+viewer.bind_key('r', next_mask)
+viewer.bind_key('f', previous_mask)
+
+# Bind hotkeys to increase brush size to 10, 20 and 40:
+viewer.bind_key('q', lambda _: update_brush_size(10))
+viewer.bind_key('w', lambda _: update_brush_size(20))
+viewer.bind_key('e', lambda _: update_brush_size(40))
 
 # Start the Napari viewer event loop
 napari.run()
