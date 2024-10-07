@@ -95,8 +95,8 @@ def center_on_mask(labels_layer, mask_id):
             print(f'Mask ID {mask_id} found in the mask coord dictionary.')
 
             # Save every idx%10
-            if current_mask_idx % 10 == 0:
-                save_mask_array(labels_layer)
+            #if current_mask_idx % 10 == 0:
+            #    save_mask_array(labels_layer)
 
         else:
             z_indices, y_indices, x_indices = np.where(labels_layer.data == mask_id)
@@ -340,9 +340,14 @@ viewer.bind_key('r', next_mask)
 viewer.bind_key('f', previous_mask)
 
 # Bind hotkeys to increase brush size to 10, 20 and 40:
-viewer.bind_key('q', lambda _: update_brush_size(10))
-viewer.bind_key('w', lambda _: update_brush_size(20))
-viewer.bind_key('e', lambda _: update_brush_size(40))
+# viewer.bind_key('q', lambda _: update_brush_size(10))
+# viewer.bind_key('w', lambda _: update_brush_size(20))
+# viewer.bind_key('e', lambda _: update_brush_size(40))
+
+# viewer.bind_key('s', lambda event: save_mask_array(select_labels_layer.labels_layer.value))
+viewer.bind_key("q", lambda event: assign_cell_type(cell_type="negative"))
+viewer.bind_key("w", lambda event: assign_cell_type(cell_type="positive"))
+viewer.bind_key("e", lambda event: assign_cell_type(cell_type="unknown"))
 
 # Start the Napari viewer event loop
 napari.run()

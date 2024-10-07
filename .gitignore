@@ -94,3 +94,6 @@ src/nucleus_3d_classification/models/model.pkl
 src/nucleus_3d_classification/test.ipynb
 /logs
 /src/nucleus_3d_classification/logs/lightning_logs
+Analysis/model_comparison.png
+Analysis/Present_Data_analysis_3Dvs2D.ipynb
+Analysis/present_Logistic_regression_and_Random_forest_compare_2D_to_3D.ipynb
