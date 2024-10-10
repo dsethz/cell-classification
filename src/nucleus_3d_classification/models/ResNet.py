@@ -228,14 +228,14 @@ class ResNet(L.LightningModule):
         recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
         f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
 
-        self.log(f'{prefix}_tp', self.tp, on_epoch=True)
-        self.log(f'{prefix}_tn', self.tn, on_epoch=True)
-        self.log(f'{prefix}_fp', self.fp, on_epoch=True)
-        self.log(f'{prefix}_fn', self.fn, on_epoch=True)
-        self.log(f'{prefix}_accuracy', accuracy, on_epoch=True)
-        self.log(f'{prefix}_precision', precision, on_epoch=True)
-        self.log(f'{prefix}_recall', recall, on_epoch=True)
-        self.log(f'{prefix}_f1', f1, on_epoch=True)
+        self.log(f'{prefix}_tp', self.tp, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_tn', self.tn, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_fp', self.fp, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_fn', self.fn, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_accuracy', accuracy, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_precision', precision, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_recall', recall, on_epoch=True, sync_dist=True)
+        self.log(f'{prefix}_f1', f1, on_epoch=True, sync_dist=True)
 
         print(f"{prefix.capitalize()} Metrics - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}, Recall: {recall:.4f}, F1: {f1:.4f}")
         print(f"{prefix.capitalize()} Counts - TP: {self.tp}, TN: {self.tn}, FP: {self.fp}, FN: {self.fn}")
@@ -253,7 +253,7 @@ class ResNet(L.LightningModule):
         # Update metric counters
         self.update_metrics(y_hat, y)
 
-        self.log('test_loss', Test_step_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('test_loss', Test_step_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return Test_step_loss
 

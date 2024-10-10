@@ -95,8 +95,8 @@ def center_on_mask(labels_layer, mask_id):
             print(f'Mask ID {mask_id} found in the mask coord dictionary.')
 
             # Save every idx%10
-            if current_mask_idx % 10 == 0:
-               save_mask_array(labels_layer)
+            #if current_mask_idx % 10 == 0:
+            #    save_mask_array(labels_layer)
 
         else:
             z_indices, y_indices, x_indices = np.where(labels_layer.data == mask_id)
@@ -181,13 +181,13 @@ def jump_to_mask():
         print("Please enter a valid integer for the Mask ID.")
 
 # Function to assign the cell type to the current mask
-@magicgui(call_button="Assign Cell Type", cell_type={"choices": ["positive", "negative", "unknown"]}) # "megakaryocytic" changed to "positive"
-def assign_cell_type(cell_type: str):
+@magicgui(call_button="Assign", label_type={"choices": ["positive", "negative", "unknown"]}) # "megakaryocytic" changed to "positive"
+def assign_label_type(label_type: str):
     global current_mask_idx, mask_ids, sdict, id_current
     mask_id = id_current
     if mask_id != 0 and mask_id in sdict:
-        sdict[int(mask_id)]["ctype"] = cell_type
-        print(f"Assignment: {mask_id}: ctype = {cell_type}, centroid = {sdict[int(mask_id)]['centroid']}")
+        sdict[int(mask_id)]["ctype"] = label_type
+        print(f"Assignment: {mask_id}: ctype = {label_type}, centroid = {sdict[int(mask_id)]['centroid']}")
         next_mask()  # Automatically move to the next mask
 
 # Function to filter masks by label
@@ -281,7 +281,7 @@ def load_mask_dict_jump():
         print("No file selected.")
 
 # Add the widget to load the mask dictionary
-load_dict_button = QPushButton("Load Mask Coord Dict (Pickle)")
+load_dict_button = QPushButton("Load Mask Coord Dict (Pkl)")
 load_dict_button.clicked.connect(load_mask_dict_jump)
 
 # Create buttons for mask navigation and dictionary operations
@@ -291,10 +291,10 @@ next_button.clicked.connect(next_mask)
 prev_button = QPushButton("Previous Mask")
 prev_button.clicked.connect(previous_mask)
 
-save_button = QPushButton("Save Mask Dictionary JSON")
+save_button = QPushButton("Save Assignment (JSON)")
 save_button.clicked.connect(save_mask_dict)
 
-load_button = QPushButton("Load Mask Dictionary JSON")
+load_button = QPushButton("Load Assignment (JSON)")
 load_button.clicked.connect(load_mask_dict)
 
 # Filtered mask navigation
@@ -328,7 +328,7 @@ mask_jump_widget.setLayout(layout)
 # Add widgets to the viewer
 viewer.window.add_dock_widget(load_mask_dict_jump, area='right')
 viewer.window.add_dock_widget(select_labels_layer, area='right')
-viewer.window.add_dock_widget(assign_cell_type, area='right')
+viewer.window.add_dock_widget(assign_label_type, area='right')
 viewer.window.add_dock_widget(next_button, area='right')
 viewer.window.add_dock_widget(prev_button, area='right')
 viewer.window.add_dock_widget(save_button, area='right')
@@ -340,14 +340,14 @@ viewer.bind_key('r', next_mask)
 viewer.bind_key('f', previous_mask)
 
 # Bind hotkeys to increase brush size to 10, 20 and 40:
-viewer.bind_key('q', lambda _: update_brush_size(10))
-viewer.bind_key('w', lambda _: update_brush_size(20))
-viewer.bind_key('e', lambda _: update_brush_size(40))
+# viewer.bind_key('q', lambda _: update_brush_size(10))
+# viewer.bind_key('w', lambda _: update_brush_size(20))
+# viewer.bind_key('e', lambda _: update_brush_size(40))
 
 # viewer.bind_key('s', lambda event: save_mask_array(select_labels_layer.labels_layer.value))
-# viewer.bind_key("q", lambda event: assign_cell_type(cell_type="negative"))
-# viewer.bind_key("w", lambda event: assign_cell_type(cell_type="positive"))
-# viewer.bind_key("e", lambda event: assign_cell_type(cell_type="unknown"))
+viewer.bind_key("q", lambda event: assign_label_type(label_type="negative"))
+viewer.bind_key("w", lambda event: assign_label_type(label_type="positive"))
+viewer.bind_key("e", lambda event: assign_label_type(label_type="unknown"))
 
 # Start the Napari viewer event loop
 napari.run()
