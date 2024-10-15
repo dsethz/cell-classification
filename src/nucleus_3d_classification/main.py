@@ -390,7 +390,7 @@ def define_callbacks(args, callback_names: list):
     if args.enable_checkpointing:
         checkpoint_callback = create_checkpoint_callback(args)
         callbacks.append(checkpoint_callback) # TODO Change testNet val_f1 from val_f1_score or smth, else it wont work.
-        callbacks.append(ModelCheckpoint(save_top_k=1, save_on_train_epoch_end=False,monitor='val_f1',mode=args.mode,dirpath=args.dirpath,filename='best-f1_score-{epoch:02d}-{val_f1:.2f}'))
+        callbacks.append(ModelCheckpoint(save_top_k=1, save_on_train_epoch_end=False,monitor='val_f1',mode='max',dirpath=args.dirpath,filename='best-f1_score-{epoch:02d}-{val_f1:.2f}'))
     return callbacks
 
 class FineTuneLearningRateFinder(LearningRateFinder):
