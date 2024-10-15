@@ -1,0 +1,27 @@
+{
+    "param_grid": {
+        "model_class": ["ResNet50"],
+        "learning_rate": [1e-5, 1e-6],
+        "batch_size": [10],
+        "devices": [1],
+        "enable_progress_bar": [true],
+        "strategy": ["ddp"],
+        "loss_weight": ["balanced"],
+        "default_root_dir": ["/cluster/project/schroeder/AG/CD41/results"],
+        "dirpath": ["/cluster/project/schroeder/AG/CD41/results/models"],
+        "enable_checkpointing": [true],
+        "save_top_k": [1],
+        "max_epochs": [1],
+        "log_every_n_steps": [50],
+        "data_module": ["CustomDataModule"],
+        "setup_file": [" /cluster/project/schroeder/AG/CD41/data/Training/setup.json"]
+    },
+    "slurm_params": {
+        "ntasks_per_node": 1,
+        "time": "00:20:00",
+        "mem_per_cpu": "4000",
+        "cpus_per_task": 16,
+        "gpus": "titan_rtx:1",
+        "tmp": 4000
+    }
+}
