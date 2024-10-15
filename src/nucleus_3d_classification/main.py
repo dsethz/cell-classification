@@ -440,7 +440,6 @@ def clean_filename(filename):
     # Use regex to replace all special characters in the set with an underscore
     return re.sub(r'[{}]'.format(re.escape(''.join(special_chars))), '_', filename)
 
-
 class FineTuneBatchSizeFinder(BatchSizeFinder):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -748,7 +747,7 @@ def parse_arguments():
     nn_common_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
     nn_common_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
     nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
-    nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!")
+    nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
     nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
     nn_common_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
