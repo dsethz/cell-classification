@@ -18,7 +18,7 @@ def assert_dir_exists(dir_path):
         if not os.path.exists(dir_path):
             print('Creating directory:', dir_path)
             # TODO: Uncomment the line below to actually create the directory
-            # os.makedirs(path)
+            os.makedirs(dir_path)
 
 def assert_numeric_int(value):
     if isinstance(value, list):
@@ -37,8 +37,7 @@ def assert_file_exists(file_path):
         for path in file_path:
             assert_file_exists(path)
     else:
-        return
-        # raise FileNotFoundError(f"File not found: {file_path}")
+        raise FileNotFoundError(f"File not found: {file_path}")
 
 def create_combinations(param_grid):
     keys, values = zip(*param_grid.items())
@@ -63,7 +62,7 @@ def submit_job(params, slurm_params, varied_params):
         '--mem-per-cpu', slurm_params['mem_per_cpu'],
         '--cpus-per-task', str(slurm_params['cpus_per_task']),
         '--gpus', slurm_params['gpus'],
-        '--wrap', f"python train.py nn train"
+        '--wrap=', f"python train.py nn train"
     ]
 
     # Add additional parameters to the wrap command
@@ -79,18 +78,26 @@ def submit_job(params, slurm_params, varied_params):
         elif not isinstance(v, bool):
             slurm_command[-1] += f" --{k} {v}"
 
-    # Create long string for slurm command, converting int to str
-    slurm_command = [str(x) for x in slurm_command]
-    # Add quotes around the wrap command
-    slurm_command[-1] = f'"{slurm_command[-1]}"'
+    # # Create long string for slurm command, converting int to str
+    # slurm_command = [str(x) for x in slurm_command]
+    # # Add quotes around the wrap command
+    # slurm_command[-1] = f'"{slurm_command[-1]}"'
+    # slurm_command = ' '.join(slurm_command)
 
-    slurm_command = ' '.join(slurm_command)
+    # Join the wrap command with double quotes directly
+    wrap_command = f'"{slurm_command[-1]}"'
+
+    # Replace the last item in the slurm_command list with the properly quoted wrap command
+    slurm_command[-1] = wrap_command
+
+    # Convert the slurm_command list to a single string, but leave no gap for the wrap command
+    slurm_command = ' '.join([str(x) for x in slurm_command[:-1]]) + slurm_command[-1]
 
     # DEBUG: Print the submission command
     print(f'Submission:\n', slurm_command)
 
     # TODO: Uncomment the line below to actually submit the job
-    # subprocess.run(slurm_command, shell=True)
+    subprocess.run(slurm_command, shell=True)
 
 def main():
     parser = argparse.ArgumentParser(description="Submit sbatch jobs from a JSON file")
@@ -101,7 +108,7 @@ def main():
     param_grid = config['param_grid']
     slurm_params = config['slurm_params']
 
-    # Assert setup_file exists
+    # TODO: Assert setup_file exists
     assert_file_exists(param_grid['setup_file'])
 
     # Assert numeric values are integers, where necessary
