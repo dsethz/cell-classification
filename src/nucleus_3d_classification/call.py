@@ -707,8 +707,103 @@ def save_predictions(predictions, args):
 
     print(f"Predictions saved to {save_path}")
 
+import argparse
+import sys
 
 def parse_arguments():
+    # Rewrite to work with DS
+    parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
+
+    # Top-level arguments
+    parser.add_argument(
+        '--model_type',
+        type=str,
+        choices=['nn', 'logreg', 'rf'],
+        required=True,
+        help="Model type to use ('nn', 'logreg', 'rf')"
+    )
+    parser.add_argument(
+        '--command',
+        type=str,
+        choices=['train', 'predict'],
+        required=True,
+        help="Command to execute ('train' or 'predict')"
+    )
+    parser.add_argument(
+        "--output_base_dir", 
+        type=str, 
+        default=".", 
+        help="Base directory for output files"
+    )
+
+    # Parse known arguments to determine model type and command before adding specific arguments
+    known_args, remaining_argv = parser.parse_known_args()
+
+    # Add Neural Network (NN) specific arguments
+    if known_args.model_type == 'nn':
+        nn_parser = parser.add_argument_group('Neural Network Options')
+        
+        # Common NN arguments
+        nn_parser.add_argument("--profiler", choices=[None, "simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler")
+        nn_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
+        nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+        nn_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
+        nn_parser.add_argument("--devices", default='auto', help="Devices to use for training")
+        nn_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Training accelerator")
+        nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
+        nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+        nn_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
+        nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use (e.g., early_stopping, model_checkpoint)")
+        nn_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers'], help="Neural network model class")
+        nn_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
+        nn_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
+        nn_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
+        nn_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
+        
+        # Train-specific arguments for neural networks
+        if known_args.command == 'train':
+            nn_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+            nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
+            nn_parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
+            nn_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models")
+            nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+            nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+        # Predict-specific arguments for neural networks
+        elif known_args.command == 'predict':
+            nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+            nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+            nn_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+            nn_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+            nn_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+            nn_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
+
+    # Add arguments specific to logistic regression (logreg) and random forest (rf)
+    elif known_args.model_type in ['logreg', 'rf']:
+        model_parser = parser.add_argument_group(f'{known_args.model_type.upper()} Options')
+        
+        # Common arguments for both train and predict commands
+        model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+        model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+
+        # Train-specific arguments
+        if known_args.command == 'train':
+            model_parser.add_argument("--data", type=str, required=True, help="Data file for training")
+            model_parser.add_argument("--save_dir", type=str, default="./models", help="Directory to save the model")
+            model_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+            model_parser.add_argument("--save_name", type=str, default=f'{known_args.model_type}_model', help="Filename for the saved model")
+            if known_args.model_type == "logreg":
+                model_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
+
+        # Predict-specific arguments
+        elif known_args.command == 'predict':
+            model_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+            model_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+            model_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
+
+    args = parser.parse_args()
+    return args
+
+def _parse_arguments():
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
 
     # First level: model type

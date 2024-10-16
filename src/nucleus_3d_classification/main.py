@@ -24,8 +24,16 @@ def main():
     parser.add_argument('--model_type', type=str, choices=['nn', 'logreg', 'rf'])
     # Command argument for training or prediction
     parser.add_argument('--command', type=str, choices=['train', 'predict'])
+    
+    # Data arg for model runner to not cry
+    parser.add_argument('--data', type=str)
+    
     # Base directory for output files
     parser.add_argument("--output_base_dir", type=str, required=True, help="Base directory for output files")
+
+    # Output base dir is essentially creating subdir names, these are arguments for where to store stuff
+    # the lightning args "default_root_dir" and "dirpath" will require this output_base_dir,
+    # and should then create subfolders "logs" and "models", respectively.    
 
     # Capture additional arguments to pass directly to call.py
     args, unknown = parser.parse_known_args()
@@ -52,7 +60,7 @@ def main():
     print(f'Submission:\n', submit_command)
 
     # Execute the command
-    subprocess.run(submit_command, shell=True)
+    # subprocess.run(submit_command, shell=True)
 
 if __name__ == "__main__":
     main()

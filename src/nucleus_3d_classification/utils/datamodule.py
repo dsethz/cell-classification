@@ -209,8 +209,8 @@ def create_combined_dataset(data_list, target_size):
     return combined_dataset
 
 def main():
-    data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json', batch_size=2, num_workers=4)
-    
+    #data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json', batch_size=2, num_workers=4)
+    return
     # data_module.prepare_data()
     # data_module.setup()
 
