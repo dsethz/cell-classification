@@ -1,44 +1,40 @@
-# This is the entry point, which would call call.py.
-
 import argparse
 import pathlib
 import subprocess
+import sys
 
-# We will construct the argument parser here, and send a command calling call.py using slightly modified args.
+def get_call_py_path():
+    # Get the absolute path of the current script (e.g., main.py)
+    script_path = pathlib.Path(__file__).resolve()
+
+    # Search upwards in the directory hierarchy for the 'src' folder
+    for parent in script_path.parents:
+        potential_path = parent / 'src' / 'nucleus_3d_classification' / 'call.py'
+        if potential_path.exists():
+            return potential_path
+
+    # If we reach here, call.py was not found
+    print("Error: call.py not found in the expected directory structure.")
+    sys.exit(1)
 
 def main():
-
     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction", add_help=False)
 
-    # If input to argparse is --nn/--logreg/--rf it should be translated to 'nn', 'logreg', 'rf' for the call.py script
+    # Model type argument
     parser.add_argument('--model_type', type=str, choices=['nn', 'logreg', 'rf'])
-    # If input to argparse is --train/--predict it should be translated to 'train', 'predict' for the call.py script
+    # Command argument for training or prediction
     parser.add_argument('--command', type=str, choices=['train', 'predict'])
-    
-    # Additional model runner args:
+    # Base directory for output files
     parser.add_argument("--output_base_dir", type=str, required=True, help="Base directory for output files")
 
-    # Additional arguments should be passed as is, we will simply pass them as is to call.py.
-    # We will not 'catch' them here, as we want to pass them as is to call.py.
-
+    # Capture additional arguments to pass directly to call.py
     args, unknown = parser.parse_known_args()
 
     # DEBUG: Print the parsed arguments
     print(f'Parsed arguments: {args}, unknown: {unknown}')
 
-    # Find call.py
-        # Determine the base directory of your project
-    try:
-        base_dir = pathlib.Path(__file__).resolve().parent.parent.parent
-
-        # Build the relative path to call.py
-        call_py_path = base_dir / 'src' / 'nucleus_3d_classification' / 'call.py'
-    
-    except Exception as e:
-        print(f"Could not find call.py: {e}")
-        return
-
-
+    # Get the absolute path to call.py
+    call_py_path = get_call_py_path()
 
     # Construct the submit command
     submit_command = [
@@ -52,12 +48,11 @@ def main():
     # Create a long string for the submit command
     submit_command = ' '.join([str(x) for x in submit_command])
 
-    # print the output command
+    # Print the constructed submit command
     print(f'Submission:\n', submit_command)
 
-    # Submit the job
+    # Execute the command
     subprocess.run(submit_command, shell=True)
 
 if __name__ == "__main__":
     main()
-

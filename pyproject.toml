@@ -29,6 +29,7 @@ requires-python = "==3.12.2"
 
 # Pip dependencies
 dependencies = [
+    "pyqt5",
     "numpy",
     "magicgui",
     "qtpy",
@@ -55,12 +56,11 @@ testing = [
     "pytest-cov",  # https://pytest-cov.readthedocs.io/en/latest/
     "pytest-qt",  # https://pytest-qt.readthedocs.io/en/latest/
     "napari",
-    "pyqt5",
 ]
 
 [project.entry-points."console_scripts"]
-caller = "src.nucleus_3d_classification:caller"
-main = "src.nucleus_3d_classification:main"
+caller = "nucleus_3d_classification.call:main"
+main = "nucleus_3d_classification.main:main"
 
 [project.entry-points."napari.manifest"]
 cell-classification = "nucleus_3d_classification:napari.yaml"
