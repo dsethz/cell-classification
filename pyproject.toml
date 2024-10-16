@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Image Processing",
 ]
+
 # Python version requirement
 requires-python = "==3.12.2"
 
@@ -31,26 +32,19 @@ dependencies = [
     "numpy",
     "magicgui",
     "qtpy",
-    "scikit-image",
+    "scikit-image>=0.22.0",
     "jsonargparse",
     "ipykernel",  # For Jupyter notebook support
     "joblib",     # For parallel runs, random forests
-    "pandas"
-]
-
-# Conda dependencies
-conda_dependencies = [
-    "python=3.12.2",
-    "pytorch=2.3.1",
-    "torchvision=0.18.1",
-    "pytorch-lightning=2.3.3",
-    "matplotlib=3.9.1",
-    "tensorboard=2.17.1",
-    "scikit-image=0.22.0",
-    "scikit-learn=1.5.1",
-    "scipy=1.11.4",
-    "pip=24.0",
-    "lightning=2.3.3"
+    "pandas",
+    "torch==2.3.1",  # Replacing 'pytorch' with 'torch' for pip install compatibility
+    "torchvision==0.18.1",
+    "pytorch-lightning==2.3.3",
+    "matplotlib",
+    "tensorboard==2.17.1",
+    "scikit-learn==1.5.1",
+    "scipy==1.11.4",
+    "lightning==2.3.3",
 ]
 
 
@@ -64,11 +58,11 @@ testing = [
     "pyqt5",
 ]
 
-[project.entry-points."napari.manifest"]
-console_scripts = 
-    caller = src.nucleus_3d_classification:caller
-    main = src.nucleus_3d_classification:main
+[project.entry-points."console_scripts"]
+caller = "src.nucleus_3d_classification:caller"
+main = "src.nucleus_3d_classification:main"
 
+[project.entry-points."napari.manifest"]
 cell-classification = "nucleus_3d_classification:napari.yaml"
 
 
