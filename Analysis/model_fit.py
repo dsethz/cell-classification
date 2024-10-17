@@ -137,12 +137,27 @@ def prep_trim_scale_data(train_data, val_data, test_data):
 
 def calc_metrics(y_true, model, X):
     y_pred = model.predict(X)
+    test_proba = model.predict_proba(X)[:, 1]
     acc = accuracy_score(y_true, y_pred)
     cm = confusion_matrix(y_true, y_pred)
     precision = precision_score(y_true, y_pred)
     recall = recall_score(y_true, y_pred)
     f1 = 2 * (precision * recall) / (precision + recall)
-    return acc, cm, precision, recall, f1
+
+    roc_auc = roc_auc_score(y_true, model.predict_proba(X)[:, 1])    
+    precision_curve, recall_curve, _ = precision_recall_curve(y_true, test_proba)
+    pr_auc = auc(recall_curve, precision_curve)
+
+    f1_score_ = f1_score(y_true, y_pred)
+
+    confusion_matrix_ = confusion_matrix(y_true, y_pred)
+    TP = confusion_matrix_[0][0]
+    FP = confusion_matrix_[0][1]
+    FN = confusion_matrix_[1][0]
+    TN = confusion_matrix_[1][1]
+    confusion_matrix_ = f'TP: {TP}, FP: {FP}, TN: {TN}, FN: {FN}'
+
+    return acc, cm, precision, recall, f1, roc_auc, pr_auc, f1_score_, confusion_matrix_
 
 
 def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feature_type= '3D'):
@@ -161,9 +176,9 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
     model.fit(train_X, train_y)
 
     # Calculate the metrics
-    train_acc, train_cm, train_precision, train_recall, train_f1 = calc_metrics(train_y, model, train_X)
-    val_acc, val_cm, val_precision, val_recall, val_f1 = calc_metrics(val_y, model, val_X)
-    test_acc, test_cm, test_precision, test_recall, test_f1 = calc_metrics(test_y, model, test_X)
+    train_acc, train_cm, train_precision, train_recall, train_f1, train_roc_auc, train_pr_auc, train_f1_score_, train_confusion_matrix_ = calc_metrics(train_y, model, train_X)
+    val_acc, val_cm, val_precision, val_recall, val_f1, val_roc_auc, val_pr_auc, val_f1_score_, val_confusion_matrix_ = calc_metrics(val_y, model, val_X)
+    test_acc, test_cm, test_precision, test_recall, test_f1, test_roc_auc, test_pr_auc, test_f1_score, test_confusion_matrix_ = calc_metrics(test_y, model, test_X)
 
     # Save the model and metrics.
     if feature_type == '3D':
@@ -174,19 +189,25 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
             f.write(f"Train Precision: {train_precision}\n")
             f.write(f"Train Recall: {train_recall}\n")
             f.write(f"Train F1: {train_f1}\n")
-            f.write(f"Train Confusion Matrix: {train_cm}\n")
+            f.write(f"Train ROC AUC: {train_roc_auc}\n")
+            f.write(f"Train PR AUC: {train_pr_auc}\n")
+            f.write(f"Train Confusion Matrix: {train_confusion_matrix_}\n")
 
             f.write(f"Validation Accuracy: {val_acc}\n")
             f.write(f"Validation Precision: {val_precision}\n")
             f.write(f"Validation Recall: {val_recall}\n")
             f.write(f"Validation F1: {val_f1}\n")
-            f.write(f"Validation Confusion Matrix: {val_cm}\n")
+            f.write(f"Validation ROC AUC: {val_roc_auc}\n")
+            f.write(f"Validation PR AUC: {val_pr_auc}\n")
+            f.write(f"Validation Confusion Matrix: {val_confusion_matrix_}\n")
 
             f.write(f"Test Accuracy: {test_acc}\n")
             f.write(f"Test Precision: {test_precision}\n")
             f.write(f"Test Recall: {test_recall}\n")
             f.write(f"Test F1: {test_f1}\n")
-            f.write(f"Test Confusion Matrix: {test_cm}\n")
+            f.write(f"Test ROC AUC: {test_roc_auc}\n")
+            f.write(f"Test PR AUC: {test_pr_auc}\n")
+            f.write(f"Test Confusion Matrix: {test_confusion_matrix_}\n")
 
     elif feature_type == '2D':
         with open(os.path.join(logreg_2d_dir, 'logreg_2d.pkl'), 'wb') as f:
@@ -197,20 +218,33 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
             f.write(f"Train Recall: {train_recall}\n")
             f.write(f"Train F1: {train_f1}\n")
             f.write(f"Train Confusion Matrix: {train_cm}\n")
+            f.write(f"Train ROC AUC: {train_roc_auc}\n")
+            f.write(f"Train PR AUC: {train_pr_auc}\n")
+            f.write(f"Train F1 Score: {train_f1_score_}\n")
+            f.write(f"Train Confusion Matrix: {train_confusion_matrix_}\n")
 
             f.write(f"Validation Accuracy: {val_acc}\n")
             f.write(f"Validation Precision: {val_precision}\n")
             f.write(f"Validation Recall: {val_recall}\n")
             f.write(f"Validation F1: {val_f1}\n")
             f.write(f"Validation Confusion Matrix: {val_cm}\n")
+            f.write(f"Validation ROC AUC: {val_roc_auc}\n")
+            f.write(f"Validation PR AUC: {val_pr_auc}\n")
+            f.write(f"Validation F1 Score: {val_f1_score_}\n")
+            f.write(f"Validation Confusion Matrix: {val_confusion_matrix_}\n")
 
             f.write(f"Test Accuracy: {test_acc}\n")
             f.write(f"Test Precision: {test_precision}\n")
             f.write(f"Test Recall: {test_recall}\n")
             f.write(f"Test F1: {test_f1}\n")
             f.write(f"Test Confusion Matrix: {test_cm}\n")
+            f.write(f"Test ROC AUC: {test_roc_auc}\n")
+            f.write(f"Test PR AUC: {test_pr_auc}\n")
+            f.write(f"Test F1 Score: {test_f1_score}\n")
+            f.write(f"Test Confusion Matrix: {test_confusion_matrix_}\n")
 
-def fit_eval_rf(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feature_type= '3D'):
+def rf_train(param_grid, output_dir, train_X, train_y, val_X, val_y, test_X, test_y, iters:int=3, feature_type='3D'):
+    
     rf_dir = os.path.join(output_dir, 'rf')
     rf_2d_dir = os.path.join(rf_dir, '2d')
     rf_3d_dir = os.path.join(rf_dir, '3d')
@@ -222,57 +256,92 @@ def fit_eval_rf(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feat
     if not os.path.exists(rf_3d_dir):
         os.makedirs(rf_3d_dir)
 
-    model = RandomForestClassifier(class_weight='balanced')
-    model.fit(train_X, train_y)
-    # Calculate the metrics
-    train_acc, train_cm, train_precision, train_recall, train_f1 = calc_metrics(train_y, model, train_X)
-    val_acc, val_cm, val_precision, val_recall, val_f1 = calc_metrics(val_y, model, val_X)
-    test_acc, test_cm, test_precision, test_recall, test_f1 = calc_metrics(test_y, model, test_X)
+    # Generate all combinations of hyperparameters
+    param_combinations = list(product(
+        param_grid['n_estimators'],
+        param_grid['criterion'],
+        param_grid['max_depth'],
+        param_grid['min_samples_split'],
+        param_grid['min_samples_leaf'],
+        param_grid['bootstrap'],
+        param_grid['max_features'],
+        ['balanced']  # Include class_weight manually
+    ))
 
-    # Save the model and metrics.
+    val_results = {}
+    test_results = {}
+
     if feature_type == '3D':
-        with open(os.path.join(rf_3d_dir, 'rf_3d.pkl'), 'wb') as f:
-            pickle.dump(model, f)
-        with open(os.path.join(rf_3d_dir, 'metrics_3d.txt'), 'w') as f:
-            f.write(f"Train Accuracy: {train_acc}\n")
-            f.write(f"Train Precision: {train_precision}\n")
-            f.write(f"Train Recall: {train_recall}\n")
-            f.write(f"Train F1: {train_f1}\n")
-            f.write(f"Train Confusion Matrix: {train_cm}\n")
-
-            f.write(f"Validation Accuracy: {val_acc}\n")
-            f.write(f"Validation Precision: {val_precision}\n")
-            f.write(f"Validation Recall: {val_recall}\n")
-            f.write(f"Validation F1: {val_f1}\n")
-            f.write(f"Validation Confusion Matrix: {val_cm}\n")
-
-            f.write(f"Test Accuracy: {test_acc}\n")
-            f.write(f"Test Precision: {test_precision}\n")
-            f.write(f"Test Recall: {test_recall}\n")
-            f.write(f"Test F1: {test_f1}\n")
-            f.write(f"Test Confusion Matrix: {test_cm}\n")
-    
+        save_dir = rf_3d_dir
     elif feature_type == '2D':
-        with open(os.path.join(rf_2d_dir, 'rf_2d.pkl'), 'wb') as f:
-            pickle.dump(model, f)
-        with open(os.path.join(rf_2d_dir, 'metrics_2d.txt'), 'w') as f:
-            f.write(f"Train Accuracy: {train_acc}\n")
-            f.write(f"Train Precision: {train_precision}\n")
-            f.write(f"Train Recall: {train_recall}\n")
-            f.write(f"Train F1: {train_f1}\n")
-            f.write(f"Train Confusion Matrix: {train_cm}\n")
+        save_dir = rf_2d_dir
 
-            f.write(f"Validation Accuracy: {val_acc}\n")
-            f.write(f"Validation Precision: {val_precision}\n")
-            f.write(f"Validation Recall: {val_recall}\n")
-            f.write(f"Validation F1: {val_f1}\n")
-            f.write(f"Validation Confusion Matrix: {val_cm}\n")
+    # Iterate through outer loops (replicates) and train models
+    for index in prange(iters):
+        for param_set in param_combinations:
+            # Unpack the hyperparameters
+            n_estimators, criterion, max_depth, min_samples_split, min_samples_leaf, bootstrap, max_features, class_weight = param_set
+            
+            # Initialize RandomForestClassifier with the current set of hyperparameters
+            rf = RandomForestClassifier(
+                n_estimators=n_estimators,
+                criterion=criterion,
+                max_depth=max_depth,
+                min_samples_split=min_samples_split,
+                min_samples_leaf=min_samples_leaf,
+                bootstrap=bootstrap,
+                max_features=max_features,
+                class_weight=class_weight
+            )
 
-            f.write(f"Test Accuracy: {test_acc}\n")
-            f.write(f"Test Precision: {test_precision}\n")
-            f.write(f"Test Recall: {test_recall}\n")
-            f.write(f"Test F1: {test_f1}\n")
-            f.write(f"Test Confusion Matrix: {test_cm}\n")
+            # Train the model
+            rf.fit(train_X, train_y)
+
+            # Save model using a unique name based on the combination
+            model_name = f'rf_model_{index}_{n_estimators}_{criterion}_{max_depth}_{min_samples_split}_{min_samples_leaf}_{bootstrap}_{max_features}_{class_weight}.pkl'
+            
+            # Ensure the save directory exists
+            if not os.path.exists(save_dir):
+                os.makedirs(save_dir)
+                
+            with open(os.path.join(save_dir, model_name), 'wb') as f:
+                pickle.dump(rf, f)
+            
+            accuracy, _, precision, recall, f1_score_, roc_auc, pr_auc, _, confusion_matrix_ = calc_metrics(val_y, rf, val_X)
+            # Store the results
+            val_results[model_name] = {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'roc_auc': roc_auc,
+            'pr_auc': pr_auc,
+            'f1_score': f1_score_,
+            'confusion_matrix': confusion_matrix_,
+            'hyperparameters': rf.get_params()
+            }
+
+            accuracy, _, precision, recall, f1_score_, roc_auc, pr_auc, _, confusion_matrix_ = calc_metrics(test_y, rf, test_X)
+            # Store the results
+            test_results[model_name] = {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'roc_auc': roc_auc,
+            'pr_auc': pr_auc,
+            'f1_score': f1_score_,
+            'confusion_matrix': confusion_matrix_,
+            'hyperparameters': rf.get_params()
+            }
+    
+    # Order the models based on a metric.
+    val_results = dict(sorted(val_results.items(), key=lambda x: x[1]['accuracy'], reverse=True))
+    test_results = dict(sorted(test_results.items(), key=lambda x: x[1]['accuracy'], reverse=True))
+
+    val_results_df = pd.DataFrame(val_results).T
+    test_results_df = pd.DataFrame(test_results).T
+
+    val_results_df.to_csv(os.path.join(rf_dir, f'{feature_type}_val_results.csv'))
+    test_results_df.to_csv(os.path.join(rf_dir, f'{feature_type}test_results.csv'))
 
 def main():
 
@@ -284,7 +353,8 @@ def main():
     setup = json.load(open(args.setup, 'r'))
     label_name = setup['label_name']
     output_dir = setup['output_directory']
-
+    param_grid = setup['param_grid']
+ 
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -337,6 +407,7 @@ def main():
     
     # Fit the logistic regression model to the 3D data
     fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feature_type='3D')
+    rf_train(param_grid, output_dir, train_X, train_y, val_X, val_y, test_X, test_y, iters=5, feature_type='3D')
 
 
     # Load the 2D data, if it was provided. This is optional, but they do share the same labels.
@@ -371,19 +442,8 @@ def main():
 
         # Fit the logistic regression model to the 2D data
         fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feature_type='2D')
+        rf_train(param_grid, output_dir, train_X, train_y, val_X, val_y, test_X, test_y, iters=5, feature_type='2D')
 
 
 if __name__ == "__main__":
     main()
-
-
-
-## TODO:
-
-'''
-### Image of shape (139, 6672, 6661) loaded. Name: /Users/agreic/Desktop/Project/Data/Raw/Images/nucleus/sca1_extra_mask.tif
-
-### Mask array of shape (139, 6673, 6662) loaded. Name: /Users/agreic/Desktop/testing_dir/mask_dir/sca1_extra_mask.tif
-
-Re-do the feature extr. for sca1extra.
-'''
