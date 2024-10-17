@@ -10,6 +10,7 @@
 import json
 import os
 import pickle
+import argparse
 
 import napari
 import numpy as np
@@ -23,6 +24,28 @@ from qtpy.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+# Add argparse options for the script - either curation or labelling mode
+parser = argparse.ArgumentParser(description="Napari Curation and Labelling Tool")
+
+parser.add_argument(
+                '--mode', 
+                type=str,
+                choices=['curation', 'labelling'],
+                default='curation',
+                help="Select the mode for the tool (curation or labelling)"
+)
+parser.add_argument(
+                '--save_mask_array_bool',
+                type=bool,
+                default=False,
+                help="Save the mask array every 10th mask? (True/False)"
+)
+
+
+args = parser.parse_args()
+mode = args.mode
+save_mask_array_bool = args.save_mask_array_bool
 
 # Initialize the Napari viewer
 viewer = napari.Viewer()
@@ -85,7 +108,7 @@ def select_labels_layer(labels_layer: napari.layers.Labels):
 
 # Function to center on a specific mask and update its centroid
 def center_on_mask(labels_layer, mask_id):
-    global sdict, id_current, current_mask_idx
+    global sdict, id_current, current_mask_idx, save_mask_array_bool
     id_current = mask_id
 
     # Retrieve the coordinates from the dictionary
@@ -95,8 +118,9 @@ def center_on_mask(labels_layer, mask_id):
             print(f'Mask ID {mask_id} found in the mask coord dictionary.')
 
             # Save every idx%10
-            if current_mask_idx % 10 == 0:
-               save_mask_array(labels_layer)
+            if save_mask_array_bool:
+                if current_mask_idx % 10 == 0:
+                    save_mask_array(labels_layer)
 
         else:
             z_indices, y_indices, x_indices = np.where(labels_layer.data == mask_id)
@@ -339,15 +363,18 @@ viewer.window.add_dock_widget(control_widget, area='right')
 viewer.bind_key('r', next_mask)
 viewer.bind_key('f', previous_mask)
 
-# Bind hotkeys to increase brush size to 10, 20 and 40:
-viewer.bind_key('q', lambda _: update_brush_size(10))
-viewer.bind_key('w', lambda _: update_brush_size(20))
-viewer.bind_key('e', lambda _: update_brush_size(40))
+if mode == 'labelling':
+    viewer.bind_key("q", lambda event: assign_cell_type(cell_type="negative"))
+    viewer.bind_key("w", lambda event: assign_cell_type(cell_type="positive"))
+    viewer.bind_key("e", lambda event: assign_cell_type(cell_type="unknown"))
+
+elif mode == 'curation':
+    # Bind hotkeys to increase brush size to 10, 20 and 40:
+    viewer.bind_key('q', lambda _: update_brush_size(10))
+    viewer.bind_key('w', lambda _: update_brush_size(20))
+    viewer.bind_key('e', lambda _: update_brush_size(40))
 
 # viewer.bind_key('s', lambda event: save_mask_array(select_labels_layer.labels_layer.value))
-# viewer.bind_key("q", lambda event: assign_cell_type(cell_type="negative"))
-# viewer.bind_key("w", lambda event: assign_cell_type(cell_type="positive"))
-# viewer.bind_key("e", lambda event: assign_cell_type(cell_type="unknown"))
 
 # Start the Napari viewer event loop
 napari.run()

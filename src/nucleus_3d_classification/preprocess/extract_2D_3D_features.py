@@ -1,3 +1,32 @@
+"""
+This script generates 2D and 3D features from images, their masks (.tif), and mask coordinate dictionaries (.pkl).
+The mask coordinate dictionaries are generated using the script 'generate_mask_coord_dict.py', which is available at:
+https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py.
+Different files are matched to each other using their filenames and sorting them using the .sort() method.
+Usage:
+    python extract_2D_3D_features.py --image_directory <image_directory> --mask_directory <mask_directory> --filetype <filetype> --out_dir <out_dir> --coord_directory <coord_directory> --spacing <spacing> --same_columns <same_columns>
+Arguments:
+    --image_directory: Directory containing the images.
+    --mask_directory: Directory containing the masks.
+    --filetype: File type of the images and masks. Only .tif files are supported at the moment.
+    --out_dir: Output directory for the features.
+    --coord_directory: Directory containing the coordinate files.
+    --spacing: Voxel spacing for the images.
+    --same_columns: Whether to only keep the same columns in 2D and 3D features.
+The script performs the following steps:
+1. Parses the input arguments.
+2. Checks if the specified file type is supported.
+3. Creates the output directory if it doesn't exist.
+4. Detects all filenames in the user-specified input directories and sorts them.
+5. Loads pairs of image files and corresponding mask files.
+6. Extracts 2D features from each z-layer of the image and mask.
+7. Groups the 2D features by label and computes the mean across z layers.
+8. Extracts 3D features from the entire image and mask.
+9. Ensures common columns between 2D and 3D features if specified.
+10. Aligns the mask ids in both 2D and 3D features.
+11. Saves the features to disk.
+"""
+
 # Description: Generate 2D and 3D features from images, their masks (.tif), labels (.json) and mask coord dictionaries (.pkl).
 # The mask coord dictionaries are generated using the script 'generate_mask_coord_dict.py', which is available at: https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py
 # Different files are matched to each other using their filenames and sorting them using .sort() method.
@@ -17,12 +46,12 @@ import argparse
 
 # Set up argument parser
 parser = argparse.ArgumentParser(description='Generate 2D and 3D features from images, their masks (.tif), labels (.json) and mask coord dictionaries (.pkl).')
-parser.add_argument('--image_directory', type=str, default='/Users/agreic/Desktop/test/image', help='Directory containing the images.')
-parser.add_argument('--mask_directory', type=str, default='/Users/agreic/Desktop/test/mask', help='Directory containing the masks.')
+parser.add_argument('--image_directory', type=str, default='/Users/agreic/Desktop/Project/Data/Raw/Images/nucleus', help='Directory containing the images.')
+parser.add_argument('--mask_directory', type=str, default='/Users/agreic/Desktop/testing_dir/mask_dir/', help='Directory containing the masks.')
 parser.add_argument('--filetype', type=str, default='.tif', help='File type of the images and masks.')
-parser.add_argument('--out_dir', type=str, default='/Users/agreic/Desktop/test/2D_3D_features/', help='Output directory for the features.')
-parser.add_argument('--label_directory', type=str, default='/Users/agreic/Desktop/test/label/', help='Directory containing the label files.')
-parser.add_argument('--coord_directory', type=str, default='/Users/agreic/Desktop/test/coord/', help='Directory containing the coordinate files.')
+parser.add_argument('--out_dir', type=str, default='/Users/agreic/Desktop/testing_dir/out_dir/', help='Output directory for the features.')
+# parser.add_argument('--label_directory', type=str, default='/Users/agreic/Desktop/testing_dir/label_dir/', help='Directory containing the label files.')
+parser.add_argument('--coord_directory', type=str, default='/Users/agreic/Desktop/testing_dir/coord_dir/', help='Directory containing the coordinate files.')
 parser.add_argument('--spacing', type=float, nargs=3, default=(1.0, 0.24, 0.24), help='Voxel spacing for the images.')
 parser.add_argument('--same_columns', type=bool, default=False, help='Whether to only keep the same columns in 2D and 3D features.')
 
@@ -33,7 +62,7 @@ image_directory = args.image_directory
 mask_directory = args.mask_directory
 filetype = args.filetype
 out_dir = args.out_dir
-label_directory = args.label_directory
+# label_directory = args.label_directory
 coord_directory = args.coord_directory
 same_columns_flag = args.same_columns
 spacing = tuple(args.spacing)
@@ -99,28 +128,28 @@ properties = [
 # Detect all filenames in the user-specified input directories
 img_filenames = glob.glob(os.path.join(image_directory, f'*{filetype}'))
 mask_filenames = glob.glob(os.path.join(mask_directory, f'*{filetype}'))
-label_filenames = glob.glob(os.path.join(label_directory, '*.json'))
+# label_filenames = glob.glob(os.path.join(label_directory, '*.json'))
 coord_filenames = glob.glob(os.path.join(coord_directory, '*.pkl'))
 
 # Files are sorted to ensure that the corresponding files are matched
 img_filenames.sort()
 mask_filenames.sort()
-label_filenames.sort()
+# label_filenames.sort()
 coord_filenames.sort()
 
 # Prepare pd dataframe to store the features generated from slices
 features_2D = pd.DataFrame()
 features_3D = pd.DataFrame()
 
-print(f'\n### Detected {len(img_filenames)} images, {len(mask_filenames)} mask-files, {len(label_filenames)} label-files, and {len(coord_filenames)} coord-files.')
+print(f'\n### Detected {len(img_filenames)} images, {len(mask_filenames)} mask-files and {len(coord_filenames)} coord-files.')
 
 # Check if the number of images, masks and labels are the same
-assert len(img_filenames) == len(mask_filenames) == len(label_filenames) == len(coord_filenames), f'Error: Detected different amounts of files: {len(img_filenames)} images, {len(mask_filenames)} masks, {len(label_filenames)} labels and {len(coord_filenames)} coord dicts.'
+assert len(img_filenames) == len(mask_filenames) == len(coord_filenames), f'Error: Detected different amounts of files: {len(img_filenames)} images, {len(mask_filenames)} masks and {len(coord_filenames)} coord dicts.'
 
 idx = 0 # Index for the images
 
 # Load pairs of img-file and corresponding mask-file
-for img_name, mask_name, label_name, coord_name in zip(img_filenames, mask_filenames, label_filenames, coord_filenames):
+for img_name, mask_name, coord_name in zip(img_filenames, mask_filenames, coord_filenames):
 
     print(f'\n### Processing image {idx+1}/{len(img_filenames)}.')
     idx += 1
@@ -141,9 +170,9 @@ for img_name, mask_name, label_name, coord_name in zip(img_filenames, mask_filen
     print(f'\n### Mask array of shape {mask.shape} loaded. Name: {mask_name}')
 
     # Load the corresponding label file
-    with open(label_name, 'r') as f:
-        labels = json.load(f)
-    print(f'\n### Label file {label_name} loaded.')
+    # with open(label_name, 'r') as f:
+    #     labels = json.load(f)
+    # print(f'\n### Label file {label_name} loaded.')
 
     # Load the corresponding coord file
     with open(coord_name, 'rb') as f:
@@ -168,7 +197,7 @@ for img_name, mask_name, label_name, coord_name in zip(img_filenames, mask_filen
         mask_2D_features_df = pd.DataFrame(mask_2D_features)
         features_2D = pd.concat([features_2D, mask_2D_features_df], ignore_index=True)
 
-    # Group the 2D features by label
+    # Group the 2D features by label, compute the mean of label across z layers
     features_2D['label'] = features_2D['label'].astype(str)
     features_2D = features_2D.groupby('label').mean(numeric_only=True).reset_index()
 
@@ -202,29 +231,33 @@ for img_name, mask_name, label_name, coord_name in zip(img_filenames, mask_filen
     in_3D_not_in_2D = labels_3D - labels_2D
 
     if in_2D_not_in_3D:
-        print(f"Labels in 2D but not in 3D: {in_2D_not_in_3D}")
+        print(f"Masks in 2D but not in 3D: {in_2D_not_in_3D}")
     if in_3D_not_in_2D:
-        print(f"Labels in 3D but not in 2D: {in_3D_not_in_2D}")
+        print(f"Masks in 3D but not in 2D: {in_3D_not_in_2D}")
 
-    # Drop rows with labels that are not in labels
-    features_2D = features_2D[features_2D['label'].isin(labels)]
-    features_3D = features_3D[features_3D['label'].isin(labels)]
+    # Drop rows with labels that are not in labels, if provided label file
+    # features_2D = features_2D[features_2D['label'].isin(labels)]
+    # features_3D = features_3D[features_3D['label'].isin(labels)]
 
-    # Add mask_id to the features
-    features_2D['mask_id'] = features_2D['label']
-    features_3D['mask_id'] = features_3D['label']
+    # Rename the label column to mask_id
+    features_2D.rename(columns={'label': 'mask_id'}, inplace=True)
+    features_3D.rename(columns={'label': 'mask_id'}, inplace=True)
 
-    # Replace labels with cell types
-    mask_id_label = {mask_id: labels[mask_id]['ctype'] for mask_id in labels}
-    id_to_drop = [str(mask_id) for mask_id, label in mask_id_label.items() if label == 'unknown']
-    mask_id_label = {str(mask_id): label for mask_id, label in mask_id_label.items() if label != 'unknown'}
+    # # Add mask_id to the features
+    # features_2D['mask_id'] = features_2D['label']
+    # features_3D['mask_id'] = features_3D['label']
+
+    # # Replace labels with cell types
+    # mask_id_label = {mask_id: labels[mask_id]['ctype'] for mask_id in labels}
+    # id_to_drop = [str(mask_id) for mask_id, label in mask_id_label.items() if label == 'unknown']
+    # mask_id_label = {str(mask_id): label for mask_id, label in mask_id_label.items() if label != 'unknown'}
     
-    features_2D = features_2D[~features_2D['label'].isin(id_to_drop)]
-    features_3D = features_3D[~features_3D['label'].isin(id_to_drop)]
+    # features_2D = features_2D[~features_2D['label'].isin(id_to_drop)]
+    # features_3D = features_3D[~features_3D['label'].isin(id_to_drop)]
 
-    mask_id_label = {mask_id: 1 if label == 'megakaryocytic' else 0 for mask_id, label in mask_id_label.items()}
-    features_2D['label'] = features_2D['label'].map(mask_id_label)
-    features_3D['label'] = features_3D['label'].map(mask_id_label)
+    # mask_id_label = {mask_id: 1 if label == 'megakaryocytic' else 0 for mask_id, label in mask_id_label.items()}
+    # features_2D['label'] = features_2D['label'].map(mask_id_label)
+    # features_3D['label'] = features_3D['label'].map(mask_id_label)
     
     # Save the features to disk
     features_2D.to_csv(os.path.join(out_dir, f'features_2D_{img_name}.csv'), index=False)

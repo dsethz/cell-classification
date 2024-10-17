@@ -1,0 +1,34 @@
+{
+    "label_name": "CD41",
+    "train_data": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_3D_Hoxb5mCherry_LPS_1h_DAPI_mCherry_CD41_Sca-1_Il1betaPLA_C00.csv"
+    ],
+    "train_labels": [
+        "/Users/agreic/Desktop/Project/Data/Raw/5_Curated_Filtered/mask_dicts/Hoxb5.json"
+    ],
+    "val_data": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_3D_c0_0-68_1000-2400_3100-4500.csv",
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_3D_c0_0-68_950-2050_1200-2300.csv"
+    ],
+    "val_labels": [
+        "/Users/agreic/Desktop/Project/Data/Raw/5_Curated_Filtered/mask_dicts/c0_0-68_1000.json",
+        "/Users/agreic/Desktop/Project/Data/Raw/5_Curated_Filtered/mask_dicts/c0_0-68_950.json"
+    ],
+    "test_data": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_3D_c0_0-55_1950-4500_11550-14862.csv"
+    ],
+    "test_labels": [
+        "/Users/agreic/Desktop/Project/Data/Raw/5_Curated_Filtered/mask_dicts/c0_0-55.json"
+    ],
+    "train_data_2d": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_2D_Hoxb5mCherry_LPS_1h_DAPI_mCherry_CD41_Sca-1_Il1betaPLA_C00.csv"
+    ],
+    "val_data_2d": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_2D_c0_0-68_1000-2400_3100-4500.csv",
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_2D_c0_0-68_950-2050_1200-2300.csv"
+    ],
+    "test_data_2d": [
+        "/Users/agreic/Desktop/testing_dir/out_dir/features_2D_c0_0-55_1950-4500_11550-14862.csv"
+    ],
+    "output_directory": "/Users/agreic/Desktop/testing_dir/fit_output"
+}
