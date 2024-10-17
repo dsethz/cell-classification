@@ -59,7 +59,6 @@ testing = [
 ]
 
 [project.entry-points."console_scripts"]
-caller = "nucleus_3d_classification.call:main"
 main = "nucleus_3d_classification.main:main"
 
 [project.entry-points."napari.manifest"]
