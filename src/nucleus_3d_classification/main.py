@@ -109,11 +109,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.base import BaseEstimator
 
-from .utils.testdatamodule import BaseDataModule
-from .utils.datamodule import CustomDataModule
-from .utils.loss_fn import create_loss_fn_with_weights, calculate_class_weights
-from .models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
-from .models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers, testNet
+from utils.testdatamodule import BaseDataModule
+from utils.datamodule import CustomDataModule
+from utils.loss_fn import create_loss_fn_with_weights, calculate_class_weights
+from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
+from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers, testNet
 
 from lightning.pytorch.callbacks import BatchSizeFinder, ModelCheckpoint
 from lightning.pytorch.callbacks import LearningRateFinder, StochasticWeightAveraging
@@ -916,8 +916,8 @@ def _parse_arguments():
         nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
 
         # Either these have to exist, or base_output_dir has to exist.
-        nn_parser.add_argument("--default_root_dir", type=str, help="Default root directory for logs")
-        nn_parser.add_argument("--dirpath", type=str, help="Directory to save models using checkpointing")
+        nn_parser.add_argument("--default_root_dir", default=None, type=str, help="Default root directory for logs")
+        nn_parser.add_argument("--dirpath", type=str, default=None, help="Directory to save models using checkpointing")
 
         nn_parser.add_argument("--devices", default='auto', help="Devices to use for training")
         nn_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Training accelerator")

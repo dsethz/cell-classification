@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Dataset, ConcatDataset
 import tifffile as tiff
 from torchvision import transforms
 
-from .transform import scale, normalize, pad, rotate_invert
+from utils.transform import scale, normalize, pad, rotate_invert
 import lightning as L
 
 class CustomDataset(torch.utils.data.Dataset):
