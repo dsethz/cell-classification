@@ -846,9 +846,11 @@ def parse_arguments():
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
                 args.dirpath = os.path.join(args.output_base_dir, 'models')
+                create_dir_if_not_exists(args.dirpath)
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
                 args.default_root_dir = os.path.join(args.output_base_dir, 'logs')
+                create_dir_if_not_exists(args.default_root_dir)
 
         if args.command == 'predict':
             if not hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
@@ -857,9 +859,11 @@ def parse_arguments():
 
             if hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
                 setattr(args, 'save_dir', os.path.join(args.output_base_dir, 'predictions'))
+                create_dir_if_not_exists(args.save_dir)
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'save_dir') or args.save_dir is None):
                 args.save_dir = os.path.join(args.output_base_dir, 'predictions')
+                create_dir_if_not_exists(args.save_dir)
 
     return args
 
@@ -1018,6 +1022,8 @@ def _parse_arguments():
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
                 args.dirpath = os.path.join(args.output_base_dir, 'models')
+                # Create dir if it doesnt exist
+                
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
                 args.default_root_dir = os.path.join(args.output_base_dir, 'logs')
