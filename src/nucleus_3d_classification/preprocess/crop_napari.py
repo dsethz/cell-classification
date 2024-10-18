@@ -10,7 +10,7 @@ segmentation_dir = ""
 sca1_dir = "/Users/agreic/Desktop/Project/Data/Raw/Images/Sca1/"
 
 # Load the images and segmentation masks
-image = tiff.imread(os.path.join(image_dir, "240930_C0_DAPI.tif"))
+image = tiff.imread(os.path.join(image_dir, "sca1_extra_mask.tif"))
 sca1 = tiff.imread(os.path.join(sca1_dir, "240930_C5_SCA1.tif"))
 
 viewer = napari.Viewer()

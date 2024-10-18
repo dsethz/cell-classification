@@ -106,6 +106,10 @@ def main():
         z_coords = coordinates[key][0] # Get the z-coordinates of the mask
         z_coords = np.array(z_coords) # Convert to numpy array
         unique_z_layers = np.unique(z_coords) # Get the unique z-layers
+        
+        counts = np.zeros(len(unique_z_layers)) # Initialize an array to store the counts of the mask on each z-layer
+        for i, z in enumerate(unique_z_layers):
+            counts[i] = (z_coords == z).sum()
 
         max_area = counts.max()
         # Save the max area for this mask

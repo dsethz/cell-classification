@@ -104,7 +104,6 @@ class ResNet(L.LightningModule):
 
         self.conv1 = nn.Conv3d(in_channels=image_channels, out_channels=self.initial_out_channels, kernel_size=7, stride=(1,2,2), padding=3, bias=False)
         self.bn1 = nn.BatchNorm3d(self.initial_out_channels)
-        #self.relu = nn.ReLU(inplace=True)
         self.max_pool = nn.MaxPool3d(kernel_size=3, stride=(1,2,2), padding=1, ceil_mode=ceil_mode) # TODO: Check if want ceil mode true
 
         # RESIDUAL BLOCKS
@@ -136,36 +135,36 @@ class ResNet(L.LightningModule):
         self.fn += torch.sum((pred == 0) & (y == 1)).item()
 
     def forward(self, x):
-        #print(f"Input shape: {x.shape}")
+        # print(f"Input shape: {x.shape}")
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        #print(f"After Conv1: {x.shape}")
+        # print(f"After Conv1: {x.shape}")
         x = self.max_pool(x)
-        #print(f"After MaxPool: {x.shape}")
+        # print(f"After MaxPool: {x.shape}")
 
         # PADDING
         if self.padding_layer_sizes is not None:
             x = F.pad(x, self.padding_layer_sizes)  # TODO: change this to be adaptive
-            #print(f'After padding: {x.shape}')
+            # print(f'After padding: {x.shape}')
 
         # x = pad_to_shape(x, (2, 64, 48, 48, 48))
 
         x = self.conv2_x(x)
-        #print(f"After Conv2_x: {x.shape}")
+        # print(f"After Conv2_x: {x.shape}")
         x = self.conv3_x(x)
-        #print(f"After Conv3_x: {x.shape}")
+        # print(f"After Conv3_x: {x.shape}")
         x = self.conv4_x(x)
-        #print(f"After Conv4_x: {x.shape}")
+        # print(f"After Conv4_x: {x.shape}")
         x = self.conv5_x(x)
-        #print(f"After Conv5_x: {x.shape}")
+        # print(f"After Conv5_x: {x.shape}")
 
         x = self.avg_pool(x)
-        #print(f"After AvgPool: {x.shape}")
+        # print(f"After AvgPool: {x.shape}")
         x = x.view(x.size(0), -1)
-        #print(f"After Reshape: {x.shape}")
+        # print(f"After Reshape: {x.shape}")
         x = self.fc(x)
-        #print(f"After FC: {x.shape}")
+        # print(f"After FC: {x.shape}")
 
         return x
 
@@ -596,6 +595,7 @@ def main():
     #print(model)
 
     tensor = torch.randn(2, 1, 34, 164, 174) # Batch, Channel, Depth, Height, Width
+    torch.randn(2,1,35,331,179)
     output = model(tensor)
     print(output.shape)
     #print(output)

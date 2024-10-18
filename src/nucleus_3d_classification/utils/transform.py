@@ -37,12 +37,24 @@ class pad(torch.nn.Module):
         pad_width = max(0, target_width - width)
         
         # Padding configuration: (left, right, top, bottom, front, back)
-        padding = (
-            pad_width // 2, pad_width - pad_width // 2,  # Width padding
-            pad_height // 2, pad_height - pad_height // 2,  # Height padding
-            pad_depth // 2, pad_depth - pad_depth // 2  # Depth padding
-        )
+        # Eg X Y Z
 
+        # Random padding on the left or right side if theres an odd number of pixels to pad
+        if pad_width % 2 != 0:
+            padd_width = random.choice([[pad_widht // 2, pad_width - pad_width // 2], [pad_width - pad_width // 2, pad_width // 2]])
+        # Random padding on the top or bottom side if theres an odd number of pixels to pad
+        if pad_height % 2 != 0:
+            padd_height = random.choice([[pad_height // 2, pad_height - pad_height // 2], [pad_height - pad_height // 2, pad_height // 2]])
+        # Random padding on the front or back side if theres an odd number of pixels to pad
+        if pad_depth % 2 != 0:
+            padd_depth = random.choice([[pad_depth // 2, pad_depth - pad_depth // 2], [pad_depth - pad_depth // 2, pad_depth // 2]])
+
+        padding = (
+            pad_width,  # Width padding
+            pad_height,  # Height padding
+            pad_depth # Depth padding
+        )
+        
         # Apply padding using F.pad
         # Note: F.pad expects input of shape (D, H, W)
         padded_tensor = F.pad(x, padding, mode='constant', value=0)  # Use constant padding with value 0

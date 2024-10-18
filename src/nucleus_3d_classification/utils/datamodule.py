@@ -99,7 +99,8 @@ def convert_to_list(data):
 class CustomDataModule(L.LightningDataModule):
     def __init__(self,
                 setup_file=None,
-                target_size=[34,164,174],
+                target_size=[34,164,174], # This was CD41
+                # target_size=[35,331,216], # This is for all other markers rn
                 batch_size:int = None,
                 num_workers:int = None,
                 stage: str = None):
