@@ -845,10 +845,12 @@ def parse_arguments():
                 raise ValueError("Either output_base_dir or specific output directories must be provided (Values are None error).")
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
-                args.dirpath = os.path.join(args.output_base_dir, 'models')
+                args.dirpath = args.output_base_dir
+                create_dir_if_not_exists(args.dirpath)
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
-                args.default_root_dir = os.path.join(args.output_base_dir, 'logs')
+                args.default_root_dir = args.output_base_dir
+                create_dir_if_not_exists(args.default_root_dir)
 
         if args.command == 'predict':
             if not hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
@@ -856,10 +858,12 @@ def parse_arguments():
                 sys.exit(1)
 
             if hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
-                setattr(args, 'save_dir', os.path.join(args.output_base_dir, 'predictions'))
+                setattr(args, 'save_dir', os.path.join(args.output_base_dir))
+                create_dir_if_not_exists(args.save_dir)
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'save_dir') or args.save_dir is None):
-                args.save_dir = os.path.join(args.output_base_dir, 'predictions')
+                args.save_dir = os.path.join(args.output_base_dir)
+                create_dir_if_not_exists(args.save_dir)
 
     return args
 
@@ -1017,10 +1021,11 @@ def _parse_arguments():
                 raise ValueError("Either output_base_dir or specific output directories must be provided (Values are None error).")
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
-                args.dirpath = os.path.join(args.output_base_dir, 'models')
+                args.dirpath = os.path.join(args.output_base_dir)
+                
 
             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
-                args.default_root_dir = os.path.join(args.output_base_dir, 'logs')
+                args.default_root_dir = os.path.join(args.output_base_dir)
 
         if args.command == 'predict':
             if not hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
