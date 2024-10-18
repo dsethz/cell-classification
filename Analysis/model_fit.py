@@ -87,7 +87,7 @@ def load_data(data, labels):
 
             # Map the 'mask_id' to its corresponding label and create a new 'label' column
             temp_data['label'] = temp_data['mask_id'].map(
-                lambda x: 1 if mask_id_to_label[x] == 'megakaryocytic' else 0
+                lambda x: 1 if mask_id_to_label[x] == 'positive' or mask_id_to_label[x] == 'megakaryocytic' else 0
             )
         else:
             raise KeyError("The column 'mask_id' does not exist in the DataFrame.")
@@ -103,12 +103,22 @@ def load_data(data, labels):
 
 # Clean the data, in case there are unexpected columns:
 def trim(x):
-    x = x.loc[:, ~x.columns.str.contains('Identifier')] # These are not useful
-    x = x.loc[:, ~x.columns.str.contains('mask_id')] # These are not useful
-    # Remove rows, where label is not present
-    x = x.dropna(subset=['label'], axis='index')
-    # Remove NaN columns
+    # Remove columns that contain 'Identifier' or 'mask_id' in their names
+    x = x.loc[:, ~x.columns.str.contains('Identifier', case=False, na=False)]
+    x = x.loc[:, ~x.columns.str.contains('mask_id', case=False, na=False)]
+
+    # Remove feret_diameter_max, as this can cause issues for some models.
+    # x = x.loc[:, ~x.columns.str.contains('feret_diameter_max', case=False, na=False)]
+
+    # Remove rows where the 'label' column is missing
+    x = x.dropna(subset=['label'])
+
+    # Replace infinite values with NaN
+    x = x.replace([np.inf, -np.inf], np.nan)
+
+    # Remove columns that contain any NaN values
     x = x.dropna(axis=1, how='any')
+
     print(f"Data shape after trimming: {x.shape}")
     return x
 
@@ -140,22 +150,19 @@ def calc_metrics(y_true, model, X):
     test_proba = model.predict_proba(X)[:, 1]
     acc = accuracy_score(y_true, y_pred)
     cm = confusion_matrix(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
-    recall = recall_score(y_true, y_pred)
-    f1 = 2 * (precision * recall) / (precision + recall)
+    precision = precision_score(y_true, y_pred, zero_division=0)
+    recall = recall_score(y_true, y_pred, zero_division=0)
+    f1 = f1_score(y_true, y_pred, zero_division=0)
 
     roc_auc = roc_auc_score(y_true, model.predict_proba(X)[:, 1])    
     precision_curve, recall_curve, _ = precision_recall_curve(y_true, test_proba)
     pr_auc = auc(recall_curve, precision_curve)
 
-    f1_score_ = f1_score(y_true, y_pred)
+    f1_score_ = f1 # Doing this twice because i was debugging, TODO: remove one
 
-    confusion_matrix_ = confusion_matrix(y_true, y_pred)
-    TP = confusion_matrix_[0][0]
-    FP = confusion_matrix_[0][1]
-    FN = confusion_matrix_[1][0]
-    TN = confusion_matrix_[1][1]
-    confusion_matrix_ = f'TP: {TP}, FP: {FP}, TN: {TN}, FN: {FN}'
+    confusion_matrix_ = cm
+    tn, fp, fn, tp = confusion_matrix_.ravel()
+    confusion_matrix_ = f'TP: {tp}, FP: {fp}, TN: {tn}, FN: {fn}'
 
     return acc, cm, precision, recall, f1, roc_auc, pr_auc, f1_score_, confusion_matrix_
 
@@ -171,6 +178,12 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
         os.makedirs(logreg_2d_dir)
     if not os.path.exists(logreg_3d_dir):
         os.makedirs(logreg_3d_dir)
+    
+    # Print out the classes and their counts before fitting
+    print("Classes and their counts before fitting:")
+    print("Train:", train_y.value_counts())
+    print("Validation:", val_y.value_counts())
+    print("Test:", test_y.value_counts())
 
     model = LogisticRegression(max_iter=1000, class_weight='balanced')
     model.fit(train_X, train_y)
