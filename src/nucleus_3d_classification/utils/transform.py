@@ -40,13 +40,8 @@ class pad(torch.nn.Module):
         # Eg X Y Z
 
         # Random padding on the left or right side if theres an odd number of pixels to pad
-<<<<<<< HEAD
-        if pad_width % 2 != 0:
-            padd_width = random.choice([[pad_width // 2, pad_width - pad_width // 2], [pad_width - pad_width // 2, pad_width // 2]])
-=======
         pad_width = random.choice([[pad_width // 2, pad_width - pad_width // 2], [pad_width - pad_width // 2, pad_width // 2]])
 
->>>>>>> dd981786aa49fe47bbb084711d4e6dee201db9d1
         # Random padding on the top or bottom side if theres an odd number of pixels to pad
         pad_height = random.choice([[pad_height // 2, pad_height - pad_height // 2], [pad_height - pad_height // 2, pad_height // 2]])
 
@@ -54,10 +49,16 @@ class pad(torch.nn.Module):
         pad_depth = random.choice([[pad_depth // 2, pad_depth - pad_depth // 2], [pad_depth - pad_depth // 2, pad_depth // 2]])
 
         padding = (
-            pad_width,  # Width padding
-            pad_height,  # Height padding
-            pad_depth # Depth padding
+            pad_width[0], pad_width[1],  # Width padding
+            pad_height[0], pad_height[1],  # Height padding
+            pad_depth[0], pad_depth[1] # Depth padding
         )
+
+        # padding = ( ## OLD WAY
+        #     pad_width // 2, pad_width - pad_width // 2,  # Width padding
+        #     pad_height // 2, pad_height - pad_height // 2,  # Height padding
+        #     pad_depth // 2, pad_depth - pad_depth // 2  # Depth padding
+        # )
         
         # Apply padding using F.pad
         # Note: F.pad expects input of shape (D, H, W)
