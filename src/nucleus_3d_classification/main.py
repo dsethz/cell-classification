@@ -185,12 +185,14 @@ def get_nn_model_class(model_name: str):
     if callable(model) and model_name in ["ResNet50", "ResNet_custom_layers", "ResNet101", "ResNet152", "testNet"]:
         try:
             model = model()
+            print('Model instance succesfully created.')
         except TypeError:
             num_classes = 2
             image_channels = 1
             padding_layer_sizes = (2, 2, 4, 3, 7, 7)
             ceil_mode = True
             model = model(num_classes=num_classes, image_channels=image_channels, padding_layer_sizes=padding_layer_sizes, ceil_mode=ceil_mode)
+            print('TypeError encountered, falling back to default params.')
         return model.__class__
 
     return model
@@ -1101,7 +1103,7 @@ def ___parse_arguments():
     nn_train_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
     nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
     nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, help="Padding layers for ResNet")
     nn_train_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
 
     # NN Predict parser
