@@ -41,7 +41,7 @@ class pad(torch.nn.Module):
 
         # Random padding on the left or right side if theres an odd number of pixels to pad
         if pad_width % 2 != 0:
-            padd_width = random.choice([[pad_widht // 2, pad_width - pad_width // 2], [pad_width - pad_width // 2, pad_width // 2]])
+            padd_width = random.choice([[pad_width // 2, pad_width - pad_width // 2], [pad_width - pad_width // 2, pad_width // 2]])
         # Random padding on the top or bottom side if theres an odd number of pixels to pad
         if pad_height % 2 != 0:
             padd_height = random.choice([[pad_height // 2, pad_height - pad_height // 2], [pad_height - pad_height // 2, pad_height // 2]])
