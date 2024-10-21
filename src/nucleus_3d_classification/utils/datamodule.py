@@ -81,7 +81,21 @@ class CustomDataset(torch.utils.data.Dataset):
 def process_labels(label_file):
     try:
         with open(label_file, 'r') as f:
-            labels = {k: 1*(v['ctype'] == 'megakaryocytic') for k, v in json.load(f).items() if v['ctype'] != 'unknown'}
+            
+            loaded_file = json.load(f)
+
+            # if label['ctype'] == 'megakaryocytic' or label['ctype'] == 'positive', we assign a label of 1, else 0
+            labels = {}
+            for key in loaded_file:
+                if loaded_file[key]['ctype'] == 'megakaryocytic' or loaded_file[key]['ctype'] == 'positive':
+                    labels[key] = 1
+                else:
+                    labels[key] = 0
+            
+            print (labels)
+
+            # labels = {k: 1*(v['ctype'] == 'megakaryocytic') for k, v in loaded_file.items() if v['ctype'] != 'unknown'}  # this was causing a bug because prev. we used to only have megakaryocytic and negative labels
+            # print(f"old labels: {labels}")
             return labels
     except FileNotFoundError:
         print(f"Error: Label file {label_file} not found.")

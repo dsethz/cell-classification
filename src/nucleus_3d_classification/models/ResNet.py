@@ -198,6 +198,7 @@ class ResNet(L.LightningModule):
     def validation_step(self, batch, batch_idx):
         loss_fn = self.loss_fn
         x, y = batch
+        # print(f"True labels: {y}")
         y_hat = self.forward(x)
         val_loss = loss_fn(y_hat, y)
 
