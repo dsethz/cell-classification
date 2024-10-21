@@ -111,7 +111,7 @@ from sklearn.base import BaseEstimator
 
 from utils.testdatamodule import BaseDataModule
 from utils.datamodule import CustomDataModule
-from utils.loss_fn import create_loss_fn_with_weights, calculate_class_weights
+from utils.loss_fn import create_loss_fn_with_weights
 from models.testmodels import BaseNNModel, BaseNNModel2, testBlock, get_BaseNNModel, get_BaseNNModel2
 from models.ResNet import ResNet50, ResNet101, ResNet152, ResNet_custom_layers, testNet
 
@@ -189,7 +189,7 @@ def get_nn_model_class(model_name: str):
         except TypeError:
             num_classes = 2
             image_channels = 1
-            padding_layer_sizes = (2, 2, 4, 3, 7, 7)
+            padding_layer_sizes = (20, 21, 6, 6, 0, 1),
             ceil_mode = True
             model = model(num_classes=num_classes, image_channels=image_channels, padding_layer_sizes=padding_layer_sizes, ceil_mode=ceil_mode)
             print('TypeError encountered, falling back to default params.')
@@ -478,7 +478,8 @@ def load_data_module(args):
     elif args.data_module == "CustomDataModule":
         if not hasattr(args, 'setup_file') or hasattr(args, 'setup_file') and args.setup_file is None: #TODO remove this logic later
             try:
-                setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
+                setup_file = args.data
+                # setup_file = '/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json'
             except FileNotFoundError: # TODO remove this logic later
                 pass
         else:
@@ -501,29 +502,29 @@ def load_data_module(args):
     else:
         raise ValueError(f"Unknown data module: {args.data_module}")
 
-    if not hasattr(args, 'stage'):
-        data_module.setup()
-    else:
-        args.stage = args.stage.lower()
+    # if not hasattr(args, 'stage') :
+    #     data_module.setup()
+    # else:
+    #     args.stage = args.stage.lower()
 
-        if args.stage == "fit" or args.stage == "train":
-            data_module.setup(stage="fit")
-        elif args.stage == "validate":
-            data_module.setup(stage="validate")
-        elif args.stage == "test":
-            data_module.setup(stage="test")
-        elif args.stage == "predict":
-            data_module.setup(stage="predict")
-        else:
-            data_module.setup()
+    #     if args.stage == "fit" or args.stage == "train":
+    #         data_module.setup(stage="fit")
+    #     elif args.stage == "validate":
+    #         data_module.setup(stage="validate")
+    #     elif args.stage == "test":
+    #         data_module.setup(stage="test")
+    #     elif args.stage == "predict":
+    #         data_module.setup(stage="predict")
+    #     else:
+    #         data_module.setup()
 
     return data_module
 
 
 def train_nn_model(args):
-    data_module = load_data_module(args)
+    # data_module = load_data_module(args)
     #print(f"train loader is type {type(data_module.train_dataloader())}")
-    loss_fn = create_loss_fn_with_weights(data_module.train_dataloader(), loss_fn=args.loss_fn, weight=args.loss_weight)
+    loss_fn = create_loss_fn_with_weights(setup_file=args.setup_file, loss_fn=args.loss_fn, weight=args.loss_weight)
     extra_args = get_extra_args(args, loss_fn=loss_fn)
     model = get_nn_model(args.model_class, extra_args)
 
@@ -543,7 +544,7 @@ def train_nn_model(args):
     # Same with other logger:
     # Start recording memory snapshot history
     # start_record_memory_history()
-    trainer.fit(model, datamodule=data_module)
+    trainer.fit(model, datamodule=load_data_module(args))
 
    # Create the memory snapshot file
     # export_memory_snapshot()
@@ -673,6 +674,10 @@ def predict_nn_model(args):
     model.eval()
     model.freeze()
 
+    if not hasattr(args, 'stage') or args.stage is None:
+        args.stage = 'test'
+        print("No stage provided, defaulting to 'test'")
+
     if args.stage == "predict":
         print("Predicting - this is not implemented yet for CustomDataModule!")
         predictions = trainer.predict(model, datamodule=data_module)
@@ -779,7 +784,7 @@ def parse_arguments():
             nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
             nn_parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
             nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-            nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+            nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(20, 21, 6, 6, 0, 1), help="Padding layers for ResNet")
             nn_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models")
 
         # Predict-specific arguments for neural networks
@@ -788,6 +793,7 @@ def parse_arguments():
             nn_parser.add_argument("--save_dir", type=str, help="Directory to save predictions")
             nn_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
             nn_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
+            nn_parser.add_argument("--stage", type=str, default=None, choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
 
     # Add arguments specific to logistic regression (logreg) and random forest (rf)
     elif known_args.model_type in ['logreg', 'rf']:

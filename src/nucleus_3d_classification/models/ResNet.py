@@ -191,7 +191,8 @@ class ResNet(L.LightningModule):
         # Update metric counters
         self.update_metrics(y_hat, y)
 
-        self.log('training_loss', loss, sync_dist=True)
+        values = {"training_loss": loss}
+        self.log_dict(values, on_epoch=True, sync_dist=True)
         return loss
     
     def validation_step(self, batch, batch_idx):

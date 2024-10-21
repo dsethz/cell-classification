@@ -1,9 +1,95 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
+import json
     
 
-def calculate_class_weights(dataloader):
+import json
+import numpy as np
+import torch
+
+def calculate_class_weights(setup_file):
+    """
+    Calculate class weights based on the frequency of labels in the training dataset.
+
+    Args:
+        setup_file (str): Path to the setup file containing the label file for training data.
+
+    Returns:
+        torch.Tensor: A tensor containing normalized class weights.
+    """
+    # Load the setup file
+    with open(setup_file, 'r') as f:
+        setup = json.load(f)
+
+    training_data_list = setup["training_data"]
+
+    # Dictionary to store the count of each label
+    label_counts = {
+        'positive': 0,
+        'negative': 0
+    }
+
+    for label_crop in training_data_list:
+        label_file = label_crop["label_file"]
+
+        # Load and extract the counts of each label
+        with open(label_file, 'r') as f:
+            labels = json.load(f)
+
+        for key, value in labels.items():
+            if value['ctype'] == 'megakaryocytic':
+                label_counts['positive'] += 1
+            if value['ctype'] == 'positive':
+                label_counts['positive'] += 1
+            if value['ctype'] == 'negative':
+                label_counts['negative'] += 1
+
+    print("Unique labels and their counts are:", label_counts)
+
+    # Calculate class weights based on label frequencies
+    label_values = np.array(list(label_counts.values()))
+    class_weights = 1.0 / label_values
+    class_weights = class_weights / class_weights.sum()
+
+    print("Calculated class weights are:", class_weights)
+    return torch.tensor(class_weights, dtype=torch.float)
+
+
+def create_loss_fn_with_weights(setup_file, loss_fn, weight=None):
+    """
+    Create a weighted loss function based on class distribution in the dataloader.
+
+    Args:
+        setup_file (str): Path to the setup file containing the label file for training data.
+        loss_fn (str): Type of loss function to create ('cross_entropy', 'bce', 'mse').
+        weight (str or None): Weighting scheme for the loss ('balanced' or None).
+
+    Returns:
+        function: A weighted loss function (cross_entropy, bce, or mse) with calculated class weights.
+    """
+    if weight == 'balanced':
+        weight = calculate_class_weights(setup_file)
+        print("Calculated class weights are:", weight)
+
+    if loss_fn == 'cross_entropy':
+        def weighted_loss(pred, target):
+            return F.cross_entropy(pred, target, weight=weight if weight == 'balanced' else None)
+
+    elif loss_fn == 'bce':
+        def weighted_loss(pred, target):
+            return F.binary_cross_entropy(pred, target, weight=weight if weight == 'balanced' else None)
+
+    elif loss_fn == 'mse':
+        def weighted_loss(pred, target):
+            return F.mse_loss(pred, target, weight=weight if weight == 'balanced' else None)
+
+    else:
+        raise ValueError(f"Invalid loss_fn argument: {loss_fn}")
+
+    return weighted_loss
+
+def _calculate_class_weights(dataloader):
     """
     Calculate class weights based on the frequency of labels in the training dataset.
 
@@ -34,9 +120,8 @@ def calculate_class_weights(dataloader):
     class_weights = class_weights / class_weights.sum()
 
     return class_weights
-import torch.nn.functional as F
 
-def create_loss_fn_with_weights(dataloader, loss_fn, weight=None):
+def _create_loss_fn_with_weights(dataloader, loss_fn, weight=None):
     """
     Create a weighted loss function based on class distribution in the dataloader.
 
