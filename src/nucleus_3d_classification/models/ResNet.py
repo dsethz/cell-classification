@@ -189,7 +189,7 @@ class ResNet(L.LightningModule):
         loss = loss_fn(y_hat, y)
 
         # Update metric counters
-        self.update_metrics(y_hat, y)
+        # self.update_metrics(y_hat, y)
 
         values = {"training_loss": loss}
         self.log_dict(values, on_epoch=True, sync_dist=True)
@@ -210,9 +210,9 @@ class ResNet(L.LightningModule):
 
         return val_loss
 
-    def on_train_epoch_end(self):
-        self.log_metrics('train')
-        self.reset_metrics()
+    # def on_train_epoch_end(self):
+    #     self.log_metrics('train')
+    #     self.reset_metrics()
 
     def on_validation_epoch_end(self):
         self.log_metrics('val')

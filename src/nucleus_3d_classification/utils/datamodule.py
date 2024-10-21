@@ -92,7 +92,7 @@ def process_labels(label_file):
                 else:
                     labels[key] = 0
             
-            print (labels)
+            # print (labels)
 
             # labels = {k: 1*(v['ctype'] == 'megakaryocytic') for k, v in loaded_file.items() if v['ctype'] != 'unknown'}  # this was causing a bug because prev. we used to only have megakaryocytic and negative labels
             # print(f"old labels: {labels}")
