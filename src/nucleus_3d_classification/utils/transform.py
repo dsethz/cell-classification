@@ -135,7 +135,6 @@ class rotate_invert(torch.nn.Module):
         # Optionally rotate along the z-axis (depth)
         #if random.random() < self.rotate_prob:
         #    image = self.rotate_along_z(image)
-        # TODO: Ask if rotations should be included, as we have unequal dimensions! 34,164,174
 
         # Optionally invert along the z-axis (depth)
         if random.random() < self.invert_z_prob:

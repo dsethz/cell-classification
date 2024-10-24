@@ -103,3 +103,5 @@ src/nucleus_3d_classification/preprocess/run.txt
 Analysis/test.ipynb
 Analysis/cd41_fitting.ipynb
 src/nucleus_3d_classification/preprocess/crop_napari.py
+src/testing.ipynb
+/test_output
