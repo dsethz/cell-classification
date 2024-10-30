@@ -135,12 +135,16 @@ def prep_trim_scale_data(train_data, val_data, test_data):
 
     train_X = train_data.drop(columns=['label'])
     train_X = scaler.fit_transform(train_X)
+    # Add back col names.
+    train_X = pd.DataFrame(train_X, columns = train_data.drop(columns=['label']).columns)
     train_y = train_data['label']
     val_X = val_data.drop(columns=['label'])
     val_X = scaler.transform(val_X)
+    val_X = pd.DataFrame(val_X, columns = val_data.drop(columns=['label']).columns)
     val_y = val_data['label']
     test_X = test_data.drop(columns=['label'])
     test_X = scaler.transform(test_X)
+    test_X = pd.DataFrame(test_X, columns = test_data.drop(columns=['label']).columns)
     test_y = test_data['label']
 
     return train_X, train_y, val_X, val_y, test_X, test_y
@@ -185,7 +189,23 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
     print("Validation:", val_y.value_counts())
     print("Test:", test_y.value_counts())
 
-    model = LogisticRegression(max_iter=1000, class_weight='balanced')
+    # For Feature analysis, we will save the train_X to a csv_file.
+    if feature_type == '3D':
+        # Save as csv
+        train_X_df = pd.DataFrame(train_X)
+        train_X_df.to_csv(os.path.join(logreg_3d_dir, 'train_3D.csv'))
+        # Save labels
+        train_y_df = pd.DataFrame(train_y, columns=['label'])
+        train_y_df.to_csv(os.path.join(logreg_3d_dir, 'train_3D_labels.csv'))
+    elif feature_type == '2D':
+        # Save as csv
+        train_X_df = pd.DataFrame(train_X)
+        train_X_df.to_csv(os.path.join(logreg_2d_dir, 'train_2D.csv'))
+        # Save labels
+        train_y_df = pd.DataFrame(train_y, columns=['label'])
+        train_y_df.to_csv(os.path.join(logreg_2d_dir, 'train_2D_labels.csv'))
+
+    model = LogisticRegression(max_iter=100000, class_weight='balanced')
     model.fit(train_X, train_y)
 
     # Calculate the metrics
@@ -359,7 +379,7 @@ def rf_train(param_grid, output_dir, train_X, train_y, val_X, val_y, test_X, tes
 def main():
 
     parser = argparse.ArgumentParser(description='Fit models to the 2D and 3D features extracted using the script extract_2D_3D_features.py.')
-    parser.add_argument('--setup', type=str, default="/Users/agreic/Documents/GitHub/cell-classification/Analysis/example.json", help='File containing the neccessary setup for the model fitting.')
+    parser.add_argument('--setup', type=str, default="/Users/agreic/Documents/GitHub/cell-classification/Analysis/cd41_fit.json", help='File containing the neccessary setup for the model fitting.')
 
     args = parser.parse_args()
 
