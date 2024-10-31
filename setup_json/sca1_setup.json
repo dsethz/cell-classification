@@ -1,0 +1,31 @@
+{
+    "target_size": [35, 331, 216],
+    "batch_size": 2,
+    "num_workers": 4,
+    "training_data": 
+        [
+            {
+            "label_file": "N:/schroeder/Data/AG/Data/Processed/labels/240930_SCA1.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/240930_DAPI_C0_curated_cutouts/"
+            }
+        ],
+    "validation_data":
+        [
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/240928_SCA1.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/240928_DAPI_C0_filtered_sampled_curated_sca1_cutouts/"
+            },
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/240930_sca1_extra_SCA1.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/sca1_extra_mask_cutouts/"
+            }
+    
+        ],
+    "test_data":
+        [
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/241001_SCA1.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/241001_DAPI_C0_filtered_sampled_cutouts/"
+            }
+        ]
+    }

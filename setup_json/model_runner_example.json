@@ -1,0 +1,73 @@
+{
+    "job_parameters": {
+        "gpu_type": "titan_rtx",
+        "logfile_dir": "/cluster/project/schroeder/AG/CD41/results/",
+        "memory": 4000,
+        "ngpus": 1,
+        "njobs_parallel": 4,
+        "processor_cores": 16,
+        "run_time": "32:00:00",
+        "scratch": 4000
+    },
+    "job_prefix": "LR_Model_CD412_",
+    "output_base_dir": "/cluster/project/schroeder/AG/CD41/results/ResNet/",
+    "runner": "/cluster/home/agreicius/cell-classification/src/nucleus_3d_classification/main.py",
+    "runner_parameters": {
+        "model_type":[
+            "nn"
+        ],
+        "command":[
+            "train"
+        ],
+        "data":[
+            "/cluster/project/schroeder/AG/CD41/data/Training/CD41_setup.json",
+            "/cluster/project/schroeder/AG/CD41/data/Training/CD41_setup.json",
+            "/cluster/project/schroeder/AG/CD41/data/Training/CD41_setup.json"
+        ],
+        "model_class": [
+            "ResNet50"
+        ],
+        "learning_rate": [
+            1e-5,
+            1e-6,
+            1e-7
+        ],
+        "batch_size": [
+            4
+        ],
+        "devices": [
+            1
+        ],
+        "enable_progress_bar": [
+            true
+        ],
+        "strategy": [
+            "ddp"
+        ],
+        "loss_weight": [
+            "balanced"
+        ],
+        "enable_checkpointing": [
+            true
+        ],
+        "save_top_k": [
+            1
+        ],
+        "max_epochs": [
+            100
+        ],
+        "log_every_n_steps": [
+            10
+        ],
+        "data_module": [
+            "CustomDataModule"
+        ]
+    }
+}
+
+
+// --model_type nn --command train --data /cluster/project/schroeder/AG/CD41/data/Training/CD41_setup.json --model_class ResNet50 --batch_size 4 --enable_progress_bar True --loss_weight balanced --data_module CustomDataModule --model_file .../ --stage test --save_dir .../
+
+// This below works
+//cd D:\AG\cell-classification-main\cell-classification-main\src\nucleus_3d_classification
+//python main.py --model_type nn --command predict --data D:\AG\setup_json\cd41_setup.json --model_class ResNet50 --batch_size 4 --enable_progress_bar --loss_weight balanced --data_module CustomDataModule --model_file N:\schroeder\Data\AG\Euler\best_models\CD412_best-f1_score-epoch=18-val_f1=0.92.ckpt --stage test --save_dir D:\AG\out

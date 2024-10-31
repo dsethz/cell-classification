@@ -1,0 +1,31 @@
+{
+    "target_size": [35, 331, 216],
+    "batch_size": 2,
+    "num_workers": 4,
+    "training_data": 
+        [
+            {
+            "label_file": "N:/schroeder/Data/AG/Data/Processed/labels/Hoxb5.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/Hoxb5mCherry_LPS_1h_DAPI_mCherry_CD41_Sca-1_Il1betaPLA_C00_cp_coord_dict_cutouts/"
+            }
+        ],
+    "validation_data":
+        [
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/c0_0-68_950.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/c0_0-68_950-2050_1200-2300_cp_curated_coord_dict_cutouts"
+            },
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/c0_0-68_1000.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/c0_0-68_1000-2400_3100-4500_cp_curated_coord_dict_cutouts"
+            }
+    
+        ],
+    "test_data":
+        [
+            {
+            "label_file":"N:/schroeder/Data/AG/Data/Processed/labels/c0_0-55.json",
+            "crop_dir": "N:/schroeder/Data/AG/Data/Processed/cutouts/c0_0-55_1950-4500_11550-14862_cp_masks_comb_coord_dict_cutouts"
+            }
+        ]
+    }

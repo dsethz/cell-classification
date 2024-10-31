@@ -450,15 +450,15 @@ def define_trainer(args, callbacks=None):
         'default_root_dir': args.default_root_dir,
         'devices': args.devices,
         'accelerator': args.accelerator,
-        'accumulate_grad_batches': args.accumulate_grad_batches,
+        'accumulate_grad_batches': args.accumulate_grad_batches if hasattr(args, 'accumulate_grad_batches') and args.accumulate_grad_batches is not None else 1,
         'fast_dev_run': args.fast_dev_run,
-        'limit_train_batches': args.limit_train_batches,
-        'limit_val_batches': args.limit_val_batches,
-        'limit_test_batches': args.limit_test_batches,
-        'limit_predict_batches': args.limit_predict_batches,
-        'log_every_n_steps': args.log_every_n_steps,
-        'sync_batchnorm': args.sync_batchnorm,
-        'enable_checkpointing': args.enable_checkpointing,
+        'limit_train_batches': args.limit_train_batches if hasattr(args, 'limit_train_batches') and args.limit_train_batches is not None else 1.0,
+        'limit_val_batches': args.limit_val_batches if hasattr(args, 'limit_val_batches') and args.limit_val_batches is not None else 1.0,
+        'limit_test_batches': args.limit_test_batches if hasattr(args, 'limit_test_batches') and args.limit_test_batches is not None else 1.0,
+        'limit_predict_batches': args.limit_predict_batches if hasattr(args, 'limit_predict_batches') and args.limit_predict_batches is not None else 1.0,
+        'log_every_n_steps': args.log_every_n_steps if hasattr(args, 'log_every_n_steps') and args.log_every_n_steps is not None else 10,
+        'sync_batchnorm': args.sync_batchnorm if hasattr(args, 'sync_batchnorm') and args.sync_batchnorm is not None else False,
+        'enable_checkpointing': args.enable_checkpointing if hasattr(args, 'enable_checkpointing') and args.enable_checkpointing is not None else False,
         'strategy': args.strategy,
         'gradient_clip_val': args.gradient_clip_val,
         'callbacks': callbacks,
@@ -647,10 +647,16 @@ def predict_nn_model(args):
     # Define possible paths and file names to attempt loading
     model_paths = [
         f"{args.model_file}",
-        f"{args.model_file}.ckpt",
-        os.path.join(args.model_dir, f"{args.model_file}"),
-        os.path.join(args.model_dir, f"{args.model_file}.ckpt")
+        f"{args.model_file}.ckpt"
     ]
+
+    if hasattr(args, 'model_dir') and args.model_dir is not None:
+        model_paths = [
+            f"{args.model_file}",
+            f"{args.model_file}.ckpt",
+            os.path.join(args.model_dir, f"{args.model_file}"),
+            os.path.join(args.model_dir, f"{args.model_file}.ckpt")
+        ]
 
     model = None
 
