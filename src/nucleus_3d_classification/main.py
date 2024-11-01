@@ -992,7 +992,7 @@ def _parse_arguments():
             model_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
             model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
             model_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
-            model_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
+            model_parser.add_argument("--save_name", type=str, default=f'{args.model_type}_model', help="Filename for saved model")
 
             if known_args.model_type == "logreg":
                 model_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
