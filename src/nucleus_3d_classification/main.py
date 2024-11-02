@@ -714,9 +714,25 @@ def parse_arguments():
         description="Flexible model training and prediction interface", 
         add_help=False
     )
-    top_parser.add_argument('--model_type', type=str, choices=['nn', 'logreg', 'rf'], required=True, help="Model type to use ('nn', 'logreg', 'rf')")
-    top_parser.add_argument('--command', type=str, choices=['train', 'predict'], required=True, help="Command to execute ('train' or 'predict')")
-    top_parser.add_argument("--output_base_dir", type=str, help="Base directory for output files.")
+    top_parser.add_argument(
+        '--model_type',
+        type=str,
+        choices=['nn', 'logreg', 'rf'],
+        required=True,
+        help="Model type to use ('nn', 'logreg', 'rf')"
+        )
+    top_parser.add_argument(
+        '--command', 
+        type=str, 
+        choices=['train', 'predict'], 
+        required=True, 
+        help="Command to execute ('train' or 'predict')"
+        )
+    top_parser.add_argument(
+        "--output_base_dir", 
+        type=str, 
+        help="Base directory for output files."
+        )
 
     # Parse known arguments to determine model_type and command
     known_args, remaining_argv = top_parser.parse_known_args()
@@ -732,56 +748,215 @@ def parse_arguments():
         nn_parser = parser.add_argument_group('Neural Network Options')
         
         # Common required args.
-        nn_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-        nn_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule") # This is essentially --data
-        nn_parser.add_argument("--data", type=str, help="Data file for CustomDataModule") # This will be same as --setup_file
-        nn_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
+        nn_parser.add_argument(
+            "--data_module", 
+            type=str, 
+            default="BaseDataModule", 
+            help="Data module to use"
+            )
+        nn_parser.add_argument(
+            "--setup_file", 
+            type=str, 
+            help="Setup file for CustomDataModule"
+            ) # This is essentially --data. Skip if providing --data
+        nn_parser.add_argument(
+            "--data", 
+            type=str,
+            help="Data file for CustomDataModule"
+            ) # This will be same as --setup_file.
+        nn_parser.add_argument(
+            "--model_class", 
+            type=str, 
+            required=True, 
+            choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], 
+            help="Model class to use"
+            )
 
         # Optional args. for Trainer.
-        nn_parser.add_argument("--profiler", choices=[None, "simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler")
-        nn_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
+        nn_parser.add_argument(
+            "--profiler", 
+            choices=[None, "simple", "advanced"], 
+            default=None, 
+            help="Enable PyTorch Lightning profiler"
+            )
+        nn_parser.add_argument(
+            "--enable_progress_bar", 
+            action="store_true", 
+            help="Enables the progress bar"
+            )
 
-        nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+        nn_parser.add_argument(
+            "--max_epochs", 
+            type=int, 
+            default=10, 
+            help="Max epochs for training"
+            )
         
         # Optional args. for DataModule.
-        nn_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
-        nn_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
-
-        nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
-        nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
-        nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
-        nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+        nn_parser.add_argument(
+            "--num_workers", 
+            default=None, 
+            help="Number of workers for dataloader"
+            )
+        nn_parser.add_argument(
+            "--batch_size", 
+            default=None, 
+            help="Batch size for dataloader"
+            )
+        nn_parser.add_argument(
+            "--limit_train_batches", 
+            type=float, 
+            default=1.0, 
+            help="Limit train batches"
+            )
+        nn_parser.add_argument(
+            "--limit_val_batches", 
+            type=float, 
+            default=1.0, 
+            help="Limit validation batches"
+            )
+        nn_parser.add_argument(
+            "--limit_test_batches", 
+            type=float, 
+            default=1.0, 
+            help="Limit test batches"
+            )
+        nn_parser.add_argument(
+            "--limit_predict_batches", 
+            type=float, 
+            default=1.0, 
+            help="Limit predict batches"
+            )
 
         # Either these have to exist, or base_output_dir has to exist.
-        nn_parser.add_argument("--default_root_dir", type=str, help="Default root directory for logs")
-        nn_parser.add_argument("--dirpath", type=str, help="Directory to save models using checkpointing")
+        nn_parser.add_argument(
+            "--default_root_dir", 
+            type=str, 
+            help="Default root directory for logs"
+            )
+        nn_parser.add_argument(
+            "--dirpath",
+            type=str, 
+            help="Directory to save models using checkpointing"
+            )
 
-        nn_parser.add_argument("--devices", default='auto', help="Devices to use for training")
-        nn_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Training accelerator")
-        nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-        nn_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
-        nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use (e.g., early_stopping, model_checkpoint)")
+        nn_parser.add_argument(
+            "--devices", 
+            default='auto', 
+            help="Devices to use for training"
+            )
+        nn_parser.add_argument(
+            "--accelerator", 
+            type=str, 
+            default="auto", 
+            choices=['cpu', 'gpu', 'tpu'],
+            help="Training accelerator"
+            )
+        nn_parser.add_argument(
+            "--fast_dev_run", 
+            action="store_true", 
+            help="Run a fast development run"
+            )
+        nn_parser.add_argument(
+            "--log_every_n_steps", 
+            type=int, 
+            default=10, 
+            help="Log every n steps"
+            )
+        nn_parser.add_argument(
+            "--callbacks", 
+            nargs='+', 
+            help="Callbacks to use (e.g., early_stopping, model_checkpoint)"
+            )
 
         # Distributed training
-        nn_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
-        nn_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
+        nn_parser.add_argument(
+            "--strategy", 
+            type=str, 
+            default='auto',
+            help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)"
+            )
+        nn_parser.add_argument(
+            "--sync_batchnorm", 
+            action="store_true", 
+            help="Synchronize batch normalization layers"
+            )
 
-        nn_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
-        nn_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
-        nn_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
-        nn_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
-        nn_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
-        nn_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
+        nn_parser.add_argument(
+            "--enable_checkpointing", 
+            action="store_true", 
+            help="Enable model checkpointing"
+            )
+        nn_parser.add_argument(
+            "--save_top_k", 
+            type=int, 
+            default=1, 
+            help="Save top k models"
+            )
+        nn_parser.add_argument(
+            "--monitor", 
+            type=str, 
+            default="val_loss", 
+            help="Monitor metric for model checkpointing"
+            )
+        nn_parser.add_argument(
+            "--monitor_stop", 
+            type=str, 
+            default="val_loss", 
+            help="Monitor metric for early stopping"
+            )
+        nn_parser.add_argument(
+            "--mode", 
+            type=str, 
+            default="min", 
+            help="Mode for model checkpointing ('min' or 'max')"
+            )
+        nn_parser.add_argument( # This hasnt been fully implemented, please dont use.
+            "--filename", 
+            type=str, 
+            default="model_name_data_module_name_epoch_val_loss", 
+            help="Dont use, not implemented fully. // Filename for saved models, best to not change!"
+            ) # TODO: Make this work or simply remove it.
         
-        nn_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
-        nn_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
+        nn_parser.add_argument(
+            "--loss_fn", 
+            type=str, 
+            default="cross_entropy", 
+            help="Loss function to use (cross_entropy, bce, mse)"
+            )
+        nn_parser.add_argument(
+            "--loss_weight", 
+            type=str, 
+            choices=["balanced", None], 
+            default=None, 
+            help="Class weight for classification, default is None. Will use the training labels file to calculate weights"
+            )
 
-        nn_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
-        nn_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
+        nn_parser.add_argument(
+            "--gradient_clip_val", 
+            type=float, 
+            default=None, 
+            help="Gradient clipping value"
+            )
+        nn_parser.add_argument(
+            "--learning_rate", 
+            type=float, 
+            default=1e-5, 
+            help="Learning rate for training"
+            )
     
-        nn_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
-        nn_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
-
+        nn_parser.add_argument(
+            "--lrf_args", 
+            nargs='+', 
+            default=None, 
+            help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones"
+            )
+        nn_parser.add_argument(
+            "--swa_args", 
+            nargs='+', 
+            default=None, 
+            help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy"
+            )
         
         # Train-specific arguments for neural networks
         if known_args.command == 'train':
@@ -881,283 +1056,283 @@ def parse_arguments():
 
     return args
 
-def _parse_arguments():
-    parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
+# def _parse_arguments():
+#     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
 
-    # Top-level arguments
-    parser.add_argument(
-        '--model_type',
-        type=str,
-        choices=['nn', 'logreg', 'rf'],
-        required=True,
-        help="Model type to use ('nn', 'logreg', 'rf')"
-    )
-    parser.add_argument(
-        '--command',
-        type=str,
-        choices=['train', 'predict'],
-        required=True,
-        help="Command to execute ('train' or 'predict')"
-    )
-    parser.add_argument(
-        "--output_base_dir", 
-        type=str,
-        help="Base directory for output files. Provide either this, or the specific output directories for models and/or predictions."
-    )
+#     # Top-level arguments
+#     parser.add_argument(
+#         '--model_type',
+#         type=str,
+#         choices=['nn', 'logreg', 'rf'],
+#         required=True,
+#         help="Model type to use ('nn', 'logreg', 'rf')"
+#     )
+#     parser.add_argument(
+#         '--command',
+#         type=str,
+#         choices=['train', 'predict'],
+#         required=True,
+#         help="Command to execute ('train' or 'predict')"
+#     )
+#     parser.add_argument(
+#         "--output_base_dir", 
+#         type=str,
+#         help="Base directory for output files. Provide either this, or the specific output directories for models and/or predictions."
+#     )
 
-    # Parse known arguments to determine model type and command before adding specific arguments
-    known_args, remaining_argv = parser.parse_known_args()
+#     # Parse known arguments to determine model type and command before adding specific arguments
+#     known_args, remaining_argv = parser.parse_known_args()
 
-    # Add Neural Network (NN) specific arguments
-    if known_args.model_type == 'nn':
-        nn_parser = parser.add_argument_group('Neural Network Options')
+#     # Add Neural Network (NN) specific arguments
+#     if known_args.model_type == 'nn':
+#         nn_parser = parser.add_argument_group('Neural Network Options')
         
-        # Common required args.
-        nn_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-        nn_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule") # This is essentially --data
-        nn_parser.add_argument("--data", type=str, help="Data file for CustomDataModule") # This will be same as --setup_file
-        nn_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
+#         # Common required args.
+#         nn_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+#         nn_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule") # This is essentially --data
+#         nn_parser.add_argument("--data", type=str, help="Data file for CustomDataModule") # This will be same as --setup_file
+#         nn_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
 
-        # Optional args. for Trainer.
-        nn_parser.add_argument("--profiler", choices=[None, "simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler")
-        nn_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
+#         # Optional args. for Trainer.
+#         nn_parser.add_argument("--profiler", choices=[None, "simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler")
+#         nn_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
 
-        nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+#         nn_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
         
-        # Optional args. for DataModule.
-        nn_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
-        nn_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
+#         # Optional args. for DataModule.
+#         nn_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
+#         nn_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
 
-        nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
-        nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
-        nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
-        nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+#         nn_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+#         nn_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+#         nn_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
+#         nn_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
 
-        # Either these have to exist, or base_output_dir has to exist.
-        nn_parser.add_argument("--default_root_dir", default=None, type=str, help="Default root directory for logs")
-        nn_parser.add_argument("--dirpath", type=str, default=None, help="Directory to save models using checkpointing")
+#         # Either these have to exist, or base_output_dir has to exist.
+#         nn_parser.add_argument("--default_root_dir", default=None, type=str, help="Default root directory for logs")
+#         nn_parser.add_argument("--dirpath", type=str, default=None, help="Directory to save models using checkpointing")
 
-        nn_parser.add_argument("--devices", default='auto', help="Devices to use for training")
-        nn_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Training accelerator")
-        nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-        nn_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
-        nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use (e.g., early_stopping, model_checkpoint)")
+#         nn_parser.add_argument("--devices", default='auto', help="Devices to use for training")
+#         nn_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Training accelerator")
+#         nn_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+#         nn_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
+#         nn_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use (e.g., early_stopping, model_checkpoint)")
 
-        # Distributed training
-        nn_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
-        nn_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
+#         # Distributed training
+#         nn_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
+#         nn_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
 
-        nn_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
-        nn_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
-        nn_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
-        nn_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
-        nn_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
-        nn_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
+#         nn_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
+#         nn_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
+#         nn_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
+#         nn_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
+#         nn_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
+#         nn_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
         
-        nn_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
-        nn_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
+#         nn_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
+#         nn_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
 
-        nn_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
-        nn_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
+#         nn_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
+#         nn_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
     
-        nn_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
-        nn_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
+#         nn_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
+#         nn_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
 
         
-        # Train-specific arguments for neural networks
-        if known_args.command == 'train':
-            nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches") # TODO: This was common before, check if works.
-            nn_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
-            nn_parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
-            nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-            nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
-            nn_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models")
+#         # Train-specific arguments for neural networks
+#         if known_args.command == 'train':
+#             nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches") # TODO: This was common before, check if works.
+#             nn_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#             nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
+#             nn_parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
+#             nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+#             nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+#             nn_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models")
 
-        # Predict-specific arguments for neural networks
-        elif known_args.command == 'predict':
-            nn_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            nn_parser.add_argument("--save_dir", type=str, help="Directory to save predictions")
-            nn_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-            nn_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
+#         # Predict-specific arguments for neural networks
+#         elif known_args.command == 'predict':
+#             nn_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+#             nn_parser.add_argument("--save_dir", type=str, help="Directory to save predictions")
+#             nn_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#             nn_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
 
-    # Add arguments specific to logistic regression (logreg) and random forest (rf)
-    elif known_args.model_type in ['logreg', 'rf']:
-        model_parser = parser.add_argument_group(f'{known_args.model_type.upper()} Options')
+#     # Add arguments specific to logistic regression (logreg) and random forest (rf)
+#     elif known_args.model_type in ['logreg', 'rf']:
+#         model_parser = parser.add_argument_group(f'{known_args.model_type.upper()} Options')
 
-        # Train-specific arguments
-        if known_args.command == 'train':
-            model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            model_parser.add_argument("--data", type=str, required=True, help="Data file")
-            model_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-            model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-            model_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
-            model_parser.add_argument("--save_name", type=str, default=f'{args.model_type}_model', help="Filename for saved model")
+#         # Train-specific arguments
+#         if known_args.command == 'train':
+#             model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#             model_parser.add_argument("--data", type=str, required=True, help="Data file")
+#             model_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+#             model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#             model_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+#             model_parser.add_argument("--save_name", type=str, default=f'{args.model_type}_model', help="Filename for saved model")
 
-            if known_args.model_type == "logreg":
-                model_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
+#             if known_args.model_type == "logreg":
+#                 model_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
 
-        # Predict-specific arguments
-        elif known_args.command == 'predict':
-            model_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            model_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-            model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            model_parser.add_argument("--data", type=str, required=True, help="Data file")
-            model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-            model_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-            model_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-            model_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
-            model_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+#         # Predict-specific arguments
+#         elif known_args.command == 'predict':
+#             model_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+#             model_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+#             model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#             model_parser.add_argument("--data", type=str, required=True, help="Data file")
+#             model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#             model_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#             model_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+#             model_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
+#             model_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
 
-    args = parser.parse_args()
+#     args = parser.parse_args()
 
-    # Check if either output_base_dir or specific output directories are provided, as well as data or setup_file
-    if args.model_type == 'nn':
-        # if not hasattr(args, 'setup_file') and not hasattr(args, 'data'):
-        #     raise ValueError("Either setup_file or data must be provided. (hasattr error)")
+#     # Check if either output_base_dir or specific output directories are provided, as well as data or setup_file
+#     if args.model_type == 'nn':
+#         # if not hasattr(args, 'setup_file') and not hasattr(args, 'data'):
+#         #     raise ValueError("Either setup_file or data must be provided. (hasattr error)")
         
-        # if args.setup_file is None and args.data is None:
-        #     raise ValueError("Either setup_file or data must be provided. (Values are None error)")
+#         # if args.setup_file is None and args.data is None:
+#         #     raise ValueError("Either setup_file or data must be provided. (Values are None error)")
 
-        if hasattr(args, "setup_file") and args.setup_file is not None:
-            args.data = args.setup_file
+#         if hasattr(args, "setup_file") and args.setup_file is not None:
+#             args.data = args.setup_file
         
-        elif hasattr(args, "data") and args.data is not None:
-            args.setup_file = args.data
+#         elif hasattr(args, "data") and args.data is not None:
+#             args.setup_file = args.data
 
-        if args.command == 'train':
+#         if args.command == 'train':
 
-            if not hasattr(args, 'output_base_dir') and not ( hasattr(args, 'dirpath') and not hasattr(args, 'default_root_dir') ):
-                print("Error: Either output_base_dir or specific output directories must be provided. (hasattr error)")
-                sys.exit(1)
+#             if not hasattr(args, 'output_base_dir') and not ( hasattr(args, 'dirpath') and not hasattr(args, 'default_root_dir') ):
+#                 print("Error: Either output_base_dir or specific output directories must be provided. (hasattr error)")
+#                 sys.exit(1)
 
-            if args.output_base_dir is None and args.dirpath is None and args.default_root_dir is None:
-                raise ValueError("Either output_base_dir or specific output directories must be provided (Values are None error).")
+#             if args.output_base_dir is None and args.dirpath is None and args.default_root_dir is None:
+#                 raise ValueError("Either output_base_dir or specific output directories must be provided (Values are None error).")
 
-            if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
-                args.dirpath = os.path.join(args.output_base_dir)
+#             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'dirpath') or args.dirpath is None):
+#                 args.dirpath = os.path.join(args.output_base_dir)
                 
 
-            if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
-                args.default_root_dir = os.path.join(args.output_base_dir)
+#             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'default_root_dir') or args.default_root_dir is None):
+#                 args.default_root_dir = os.path.join(args.output_base_dir)
 
-        if args.command == 'predict':
-            if not hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
-                print("Error: Either output_base_dir or specific output directories for predictions must be provided.")
-                sys.exit(1)
+#         if args.command == 'predict':
+#             if not hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
+#                 print("Error: Either output_base_dir or specific output directories for predictions must be provided.")
+#                 sys.exit(1)
 
-            if hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
-                setattr(args, 'save_dir', os.path.join(args.output_base_dir, 'predictions'))
+#             if hasattr(args, 'output_base_dir') and not hasattr(args, 'save_dir'):
+#                 setattr(args, 'save_dir', os.path.join(args.output_base_dir, 'predictions'))
 
-            if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'save_dir') or args.save_dir is None):
-                args.save_dir = os.path.join(args.output_base_dir, 'predictions')
+#             if (hasattr(args, 'output_base_dir') and args.output_base_dir is not None) and (not hasattr(args, 'save_dir') or args.save_dir is None):
+#                 args.save_dir = os.path.join(args.output_base_dir, 'predictions')
 
-    return args
+#     return args
 
-def ___parse_arguments():
-    parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
+# def ___parse_arguments():
+#     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")
 
-    # First level: model type
-    subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
+#     # First level: model type
+#     subparsers = parser.add_subparsers(dest="model_type", required=True, help="Model type to use ('nn', 'logreg', 'rf')")
 
-    # Neural Network parser
-    nn_parser = subparsers.add_parser('nn', help="Neural network model options")
-    nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
+#     # Neural Network parser
+#     nn_parser = subparsers.add_parser('nn', help="Neural network model options")
+#     nn_subparsers = nn_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
 
-    # Common NN arguments
-    nn_common_parser = argparse.ArgumentParser(add_help=False)
-    nn_common_parser.add_argument("--profiler", choices=[None,"simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler, choices are simple, advanced")
-    nn_common_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
-    nn_common_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
-    nn_common_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
-    nn_common_parser.add_argument("--devices", default='auto', help="Devices to use for training, expects int, default is auto")
-    nn_common_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Accelerator to use for training")
-    nn_common_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
-    nn_common_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
-    nn_common_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
-    nn_common_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
-    nn_common_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
-    nn_common_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
-    nn_common_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
-    nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
-    nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
-    nn_common_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule")
-    nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
-    # nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
-    # nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    # nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
-    # nn_common_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-    # nn_common_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
-    nn_common_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
-    nn_common_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
-    nn_common_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
-    nn_common_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
-    nn_common_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
-    nn_common_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
-    nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
-    nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
-    nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
-    nn_common_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
-    nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
-    nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
-    nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
-    nn_common_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
-    nn_common_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
+#     # Common NN arguments
+#     nn_common_parser = argparse.ArgumentParser(add_help=False)
+#     nn_common_parser.add_argument("--profiler", choices=[None,"simple", "advanced"], default=None, help="Enable PyTorch Lightning profiler, choices are simple, advanced")
+#     nn_common_parser.add_argument("--enable_progress_bar", action="store_true", help="Enables the progress bar")
+#     nn_common_parser.add_argument("--max_epochs", type=int, default=10, help="Max epochs for training")
+#     nn_common_parser.add_argument("--default_root_dir", type=str, default="./logs", help="Default root directory for logs")
+#     nn_common_parser.add_argument("--devices", default='auto', help="Devices to use for training, expects int, default is auto")
+#     nn_common_parser.add_argument("--accelerator", type=str, default="auto", choices=['cpu', 'gpu', 'tpu'], help="Accelerator to use for training")
+#     nn_common_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches")
+#     nn_common_parser.add_argument("--fast_dev_run", action="store_true", help="Run a fast development run")
+#     nn_common_parser.add_argument("--limit_train_batches", type=float, default=1.0, help="Limit train batches")
+#     nn_common_parser.add_argument("--limit_val_batches", type=float, default=1.0, help="Limit validation batches")
+#     nn_common_parser.add_argument("--limit_test_batches", type=float, default=1.0, help="Limit test batches")
+#     nn_common_parser.add_argument("--limit_predict_batches", type=float, default=1.0, help="Limit predict batches")
+#     nn_common_parser.add_argument("--log_every_n_steps", type=int, default=10, help="Log every n steps")
+#     nn_common_parser.add_argument("--callbacks", nargs='+', help="Callbacks to use: (early_stopping, model_checkpoint, lr_monitor)")
+#     nn_common_parser.add_argument("--data_module", type=str, default="BaseDataModule", help="Data module to use")
+#     nn_common_parser.add_argument("--setup_file", type=str, help="Setup file for CustomDataModule")
+#     nn_common_parser.add_argument("--model_class", type=str, required=True, choices=['ResNet50', 'ResNet101', 'ResNet152', 'ResNet_custom_layers', 'BaseNNModel', 'BaseNNModel2', 'testNet'], help="Model class to use")
+#     # nn_common_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+#     # nn_common_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+#     # nn_common_parser.add_argument("--padding_layer_sizes", type=tuple, default=(2, 2, 4, 3, 7, 7), help="Padding layers for ResNet")
+#     # nn_common_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+#     # nn_common_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+#     nn_common_parser.add_argument("--sync_batchnorm", action="store_true", help="Synchronize batch normalization layers")
+#     nn_common_parser.add_argument("--enable_checkpointing", action="store_true", help="Enable model checkpointing")
+#     nn_common_parser.add_argument("--save_top_k", type=int, default=1, help="Save top k models")
+#     nn_common_parser.add_argument("--monitor", type=str, default="val_loss", help="Monitor metric for model checkpointing")
+#     nn_common_parser.add_argument("--monitor_stop", type=str, default="val_loss", help="Monitor metric for early stopping")
+#     nn_common_parser.add_argument("--mode", type=str, default="min", help="Mode for model checkpointing ('min' or 'max')")
+#     nn_common_parser.add_argument("--dirpath", type=str, default="./models/ckpt", help="Directory to save models using checkpointing")
+#     nn_common_parser.add_argument("--filename", type=str, default="model_name_data_module_name_epoch_val_loss", help="Filename for saved models, best to not change!") # TODO: Make this work or simply remove it
+#     nn_common_parser.add_argument("--strategy", type=str, default='auto', help="Training strategy (ddp, ddp_spawn, deepspeed, etc.)")
+#     nn_common_parser.add_argument("--loss_fn", type=str, default="cross_entropy", help="Loss function to use (cross_entropy, bce, mse)")
+#     nn_common_parser.add_argument("--loss_weight", type=str, choices=["balanced", None], default=None, help="Class weight for classification, default is None")
+#     nn_common_parser.add_argument("--num_workers", default=None, help="Number of workers for dataloader")
+#     nn_common_parser.add_argument("--batch_size", default=None, help="Batch size for dataloader")
+#     nn_common_parser.add_argument("--gradient_clip_val", type=float, default=None, help="Gradient clipping value")
+#     nn_common_parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate for training")
 
-    nn_common_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
-    nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
+#     nn_common_parser.add_argument("--lrf_args", nargs='+', default=None, help="LearningRateFinder arguments. Implemented: min_lr, max_lr, num_training_steps, mode, milestones")
+#     nn_common_parser.add_argument("--swa_args", nargs='+', default=None, help="StochasticWeightAveraging arguments. Implemented: swa_lrs, swa_epoch_start, annealing_epochs, annealing_strategy")
 
-    # NN Train parser
-    nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
-    nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-    # nn_train_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for training")
+#     # NN Train parser
+#     nn_train_parser = nn_subparsers.add_parser("train", parents=[nn_common_parser], help="Train a neural network model")
+#     nn_train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#     # nn_train_parser.add_argument("--batch_size", type=int, default=None, help="Batch size for training")
 
-    nn_train_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
-    nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
-    nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
-    nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, help="Padding layers for ResNet")
-    nn_train_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
+#     nn_train_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models or ResNet_custom_layers")
+#     nn_train_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict (ResNet)")
+#     nn_train_parser.add_argument("--image_channels", type=int, default=1, help="Image channels (ResNet)")
+#     nn_train_parser.add_argument("--padding_layer_sizes", type=tuple, help="Padding layers for ResNet")
+#     nn_train_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
 
-    # NN Predict parser
-    nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
-    nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
-    nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-    nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
-    nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-    nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-    nn_predict_parser.add_argument("--stage", type=str, default="predict", choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
+#     # NN Predict parser
+#     nn_predict_parser = nn_subparsers.add_parser("predict", parents=[nn_common_parser], help="Predict using a neural network model")
+#     nn_predict_parser.add_argument("--model_file", type=str, required=True, help="Model file for prediction")
+#     nn_predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+#     nn_predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+#     nn_predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#     nn_predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+#     nn_predict_parser.add_argument("--stage", type=str, default="predict", choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
 
-    # Scikit-learn parsers (logreg and rf)
-    for model_type in ['logreg', 'rf']:
-        model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
-        model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
+#     # Scikit-learn parsers (logreg and rf)
+#     for model_type in ['logreg', 'rf']:
+#         model_parser = subparsers.add_parser(model_type, help=f"{model_type.upper()} model options")
+#         model_subparsers = model_parser.add_subparsers(dest="command", required=True, help="Command to execute ('train' or 'predict')")
 
-        # Train parser
-        train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
-        train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-        train_parser.add_argument("--data", type=str, required=True, help="Data file")
-        train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-        train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-        train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
-        train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
+#         # Train parser
+#         train_parser = model_subparsers.add_parser("train", help=f"Train a {model_type.upper()} model")
+#         train_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#         train_parser.add_argument("--data", type=str, required=True, help="Data file")
+#         train_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
+#         train_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#         train_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+#         train_parser.add_argument("--save_name", type=str, default=f'{model_type}_model', help="Filename for saved model")
 
-        if model_type == "logreg":
-            train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
+#         if model_type == "logreg":
+#             train_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
 
-        # Predict parser
-        predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
-        predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-        predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-        predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-        predict_parser.add_argument("--data", type=str, required=True, help="Data file")
-        predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-        predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-        predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-        predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
-        predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+#         # Predict parser
+#         predict_parser = model_subparsers.add_parser("predict", help=f"Predict using a {model_type.upper()} model")
+#         predict_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
+#         predict_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
+#         predict_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
+#         predict_parser.add_argument("--data", type=str, required=True, help="Data file")
+#         predict_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
+#         predict_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
+#         predict_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
+#         predict_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
+#         predict_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
 
-    args = parser.parse_args()
-    return args
+#     args = parser.parse_args()
+#     return args
 
 def process_layers_argument(args):
     """
@@ -1226,5 +1401,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# nn train --model_class ResNet_custom_layers --enable_progress_bar --callbacks BatchSizeFinder LearningRateFinder StochasticWeightAveraging --loss_weight balanced --enable_checkpointing --save_top_k 2 --default_root_dir /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --dirpath /Users/agreic/Documents/GitHub/cell-classification/src/nucleus_3d_classification/models/ --max_epochs 5 --swa_args annealing_epochs=2 swa_lrs=1e-3 swa_epoch_start=2  --data_module CustomDataModule --layers 1 0 0 0
