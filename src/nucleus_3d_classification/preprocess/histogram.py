@@ -1,8 +1,18 @@
-# This script visualizes a histogram of the sizes of the masks, and allows the user to set a
-# threshold for the size of the masks to be considered as megakaryocytes.
-# The script then filters the masks based on the threshold, and saves
-# the megakaryocyte masks and negative examples as separate dictionaries,
-# as well as a combined dictionary of the two after randomly sampling a subset of the negative examples.
+'''
+This script performs the following steps:
+1. Loads a filtered mask array and a dictionary of mask coordinates.
+2. Calculates the size and maximum area of each mask.
+3. Plots histograms of mask sizes and maximum areas.
+4. Prompts the user to input a threshold to classify masks as megakaryocytes.
+5. Filters masks based on the threshold into megakaryocyte masks and negative masks.
+6. Randomly samples a subset of negative masks.
+7. Saves the megakaryocyte masks, negative masks, and the combined masks to specified output paths.
+Arguments:
+    --mask_coordinates_path (str): Filepath where the pickled mask coordinate dictionary is saved (after filtering).
+    --mask_array_path (str): Filepath where the mask array (after manual curation) is saved.
+    --multiplier (int): The number of negative masks per megakaryocyte to sample.
+    --out_path (str): Path to output directory.
+'''
 
 import os
 import numpy as np

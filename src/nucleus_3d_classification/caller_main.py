@@ -1,3 +1,7 @@
+'''
+This file was used for testing purposes only and was not part of the final pipeline.
+'''
+
 import argparse
 import pathlib
 import subprocess

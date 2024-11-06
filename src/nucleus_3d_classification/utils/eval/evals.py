@@ -1,3 +1,10 @@
+'''
+This file contains the implementation of the custom accuracy metric.
+It was not used in the final pipeline, but was kept for reference purposes.
+One could further extend the metrics and implement additional metrics in this file,
+but this would require additional testing and validation.
+'''
+
 import torch
 import torchmetrics
 from torchmetrics import Metric

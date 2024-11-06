@@ -1,4 +1,11 @@
-# This is essentially the main function of the script, which will get called by main.py.
+######################################################################################################################
+# This script coordinates training and testing of nucleus classification with Pytorch Lightning                      #
+# Author:               Aurimas Greicius, Daniel Schirmacher                                                         #
+#                       Cell Systems Dynamics Group, D-BSSE, ETH Zurich                                              #
+# Python Version:       3.12.2                                                                                       #
+# PyTorch Version:      2.3.1                                                                                        #
+# PyTorch Lightning Version: 2.3.1                                                                                   #
+######################################################################################################################
 
 """
 Flexible ML Model Argument Parser
@@ -7,7 +14,7 @@ This script provides a flexible command-line interface for training and predicti
 including neural networks (nn), logistic regression (logreg), and random forests (rf).
 
 Usage:
-    python script_name.py <model_type> <command> [options]
+    python script_name.py --model_type <model_type> --command <command> [options]
 
 Model Types:
     - nn: Neural Network
@@ -20,23 +27,21 @@ Commands:
 
 Examples:
     1. Train a neural network with custom ResNet layers:
-       python script_name.py nn train --model_class ResNet_custom_layers --layers 4 1 2 2
+       python script_name.py --model_type nn --command train --data setup.json --model_class ResNet_custom_layers --layers 4 1 2 2 --datamodule CustomDataModule --batch_size 32
 
-    2. Train a neural network with BaseNNModel2:
-       python script_name.py nn train --model_class BaseNNModel2 --layers 3
+    2. Train a logistic regression model:
+       python script_name.py --model_type logreg --command train --data train_data.csv
 
-    3. Train a logistic regression model:
-       python script_name.py logreg train --data train_data.csv
-
-    4. Make predictions with a trained random forest model:
-       python script_name.py rf predict --model_file rf_model.pkl --data test_data.csv
+    3. Make predictions with a trained random forest model:
+       python script_name.py --model_type rf --command predict --model_file rf_model.pkl --data test_data.csv
 
 For more detailed information on available options for each model type and command,
 use the --help flag:
-    python script_name.py <model_type> <command> --help
+    python script_name.py --model_type <model_type> --command <command> --help
 
-For NN models, the following options are available:
-    - --model_class: Model class to use (ResNet50, ResNet101, ResNet152, ResNet_custom_layers, BaseNNModel, BaseNNModel2)
+The naming of the options was kept as close as possible to resemble the PyTorch Lightning Trainer and other class options.
+For NN models, the following options are of general importance:
+    - --model_class: Model class to use (ResNet50, ResNet101, ResNet152, ResNet_custom_layers, BaseNNModel, BaseNNModel2, testNet)
     - --num_classes: Number of classes to predict (ResNet)
     - --image_channels: Image channels (ResNet)
     - --padding_layer_sizes: Padding layers for ResNet
@@ -49,12 +54,13 @@ For NN models, the following options are available:
     - --monitor_stop: Monitor metric for early stopping
     - --mode: Mode for model checkpointing ('min' or 'max')
     - --dirpath: Directory to save models using checkpointing
-    - --filename: Filename for saved models
+    - --filename: Filename for saved models # Don't use this, it was not fully tested and models are saved with default naming.
     - --strategy: Training strategy (ddp, ddp_spawn, deepspeed, etc.)
-    - --loss_fn: Loss function to use (cross_entropy, bce, mse)
-    - --loss_weight: Class weight for classification
+    - --loss_fn: Loss function to use (cross_entropy, bce, mse) # Only cross_entropy was used and tested. The others are there to enable easy extension, but were not tested.
+    - --loss_weight: Class weight for classification # "balanced" or None, simply to enable calculation of class weights.
     - --num_workers: Number of workers for dataloader
     - --batch_size: Batch size for dataloader
+    - --lrf_args: LearningRateFinder arguments, example: --lrf_args min_lr=1e-6 max_lr=1e-1 num_training_steps=100 mode=cos milestones=[0, 1]
     - --swa_args: StochasticWeightAveraging arguments, example: --swa_args swa_lrs=3e-4 swa_epoch_start=15 annealing_epochs=10 annealing_strategy=cos
     - --callbacks: Callbacks to use: (early_stopping, model_checkpoint, lr_monitor), example: --callbacks early_stopping model_checkpoint lr_monitor
     - --data_module: Data module to use (BaseDataModule (testing purposes), CustomDataModule (for custom data loading))
@@ -73,12 +79,13 @@ For NN models, the following options are available:
     - --limit_predict_batches: Limit predict batches
     - --log_every_n_steps: Log every n steps
 
+Extra examples for Stochastic Weight Averaging and Learning Rate Finder arguments:
 
-# SWA args (--swa_args) example:
+# SWA args (--swa_args) examples:
 --swa_args swa_lrs=3e-4 swa_epoch_start=15 annealing_epochs=10 annealing_strategy=cos
 --swa_args swa_lrs=float swa_epoch_start=int annealing_epochs=int annealing_strategy=str
 
-# LRF args (--lrf_args) example:
+# LRF args (--lrf_args) examples:
 --lrf_args min_lr=1e-6 max_lr=1e-1 num_training_steps=100 mode=cos milestones=[0, 1]
 --lrf_args min_lr=float max_lr=float num_training_steps=int mode=str milestones=[int, int, int]
 """
@@ -95,11 +102,11 @@ import lightning as L
 import pytorch_lightning as pl
 
 # Debugging high mem usage
-from torch.profiler import profile, record_function, ProfilerActivity
-import socket
-import logging
-from datetime import datetime, timedelta
-import torch
+# from torch.profiler import profile, record_function, ProfilerActivity
+# import socket
+# import logging
+# from datetime import datetime, timedelta
+# import torch
 
 # from lightning.pytorch import seed_everything
 # seed_everything(42)
@@ -120,6 +127,7 @@ from lightning.pytorch.callbacks import LearningRateFinder, StochasticWeightAver
 from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 
 # import tensorboard
+
 class SklearnModelWrapper:
     def __init__(self, model: BaseEstimator):
 
@@ -960,21 +968,81 @@ def parse_arguments():
         
         # Train-specific arguments for neural networks
         if known_args.command == 'train':
-            nn_parser.add_argument("--accumulate_grad_batches", type=int, default=1, help="Accumulate gradient batches") # TODO: This was common before, check if works.
-            nn_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            nn_parser.add_argument("--num_classes", type=int, default=2, help="Number of classes to predict")
-            nn_parser.add_argument("--image_channels", type=int, default=1, help="Number of image channels")
-            nn_parser.add_argument("--ceil_mode", action="store_false", help="Ceil mode for ResNet on the maxpool layer, default is True")
-            nn_parser.add_argument("--padding_layer_sizes", type=tuple, default=(20, 21, 6, 6, 0, 1), help="Padding layers for ResNet")
-            nn_parser.add_argument("--layers", nargs='+', type=int, help="Number of layers for custom models")
+            nn_parser.add_argument(
+                "--accumulate_grad_batches", 
+                type=int, 
+                default=1, 
+                help="Accumulate gradient batches"
+                ) # TODO: This was under the common amongst training and testing options before, check if works.
+            nn_parser.add_argument(
+                "--data_dir", 
+                type=str, 
+                default="./data", 
+                help="Data directory"
+                )
+            nn_parser.add_argument(
+                "--num_classes", 
+                type=int,
+                default=2, 
+                help="Number of classes to predict"
+                )
+            nn_parser.add_argument(
+                "--image_channels", 
+                type=int,
+                default=1, 
+                help="Number of image channels"
+                )
+            nn_parser.add_argument(
+                "--ceil_mode",
+                action="store_false",
+                help="Ceil mode for ResNet on the maxpool layer, default is True"
+                )
+            nn_parser.add_argument(
+                "--padding_layer_sizes", 
+                type=tuple, 
+                default=(20, 21, 6, 6, 0, 1), 
+                help="Padding layers for ResNet"
+                )
+            nn_parser.add_argument(
+                "--layers",
+                nargs='+',
+                type=int,
+                help="Number of layers for custom models"
+                )
 
         # Predict-specific arguments for neural networks
         elif known_args.command == 'predict':
-            nn_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            nn_parser.add_argument("--save_dir", type=str, help="Directory to save predictions")
-            nn_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-            nn_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="File format to save predictions")
-            nn_parser.add_argument("--stage", type=str, default=None, choices={"test", "predict", "validate"}, help="Which dataloader to use (as defined in datamodule)?")
+            nn_parser.add_argument(
+                "--model_file", 
+                type=str, 
+                required=True,
+                help="Model file to use for prediction"
+                )
+            nn_parser.add_argument(
+                "--save_dir", 
+                type=str, 
+                help="Directory to save predictions"
+                )
+            nn_parser.add_argument(
+                "--save_name", 
+                type=str, 
+                default="Prediction",
+                help="Filename for saved predictions"
+                )
+            nn_parser.add_argument(
+                "--save_type", 
+                type=str, 
+                choices=['csv', 'pkl'],
+                default='pkl', 
+                help="File format to save predictions"
+                )
+            nn_parser.add_argument(
+                "--stage", 
+                type=str, 
+                default=None,
+                choices={"test", "predict", "validate"}, 
+                help="Which dataloader to use (as defined in datamodule)?"
+                ) # This defines whether to use the validation or test dataloader for prediction.
 
     # Add arguments specific to logistic regression (logreg) and random forest (rf)
     elif known_args.model_type in ['logreg', 'rf']:
@@ -982,31 +1050,116 @@ def parse_arguments():
 
         # Train-specific arguments
         if known_args.command == 'train':
-            model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            model_parser.add_argument("--data", type=str, required=True, help="Data file")
-            model_parser.add_argument("--save_dir", type=str, default="./models", help="Model save directory")
-            model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-            model_parser.add_argument("--class_weight", type=str, choices=["balanced", "None"], default="balanced", help="Class weight for classification")
+            model_parser.add_argument(
+                "--data_dir",
+                type=str,
+                default="./data",
+                help="Data directory"
+                )
+            model_parser.add_argument(
+                "--data",
+                type=str,
+                required=True,
+                help="Data file"
+                )
+            model_parser.add_argument(
+                "--save_dir",
+                type=str,
+                default="./models",
+                help="Model save directory"
+                )
+            model_parser.add_argument(
+                "--target",
+                type=str,
+                default="label",
+                help="Target column for prediction"
+                )
+            model_parser.add_argument(
+                "--class_weight",
+                type=str,
+                choices=["balanced", "None"],
+                default="balanced",
+                help="Class weight for classification"
+                )
         
 
             if known_args.model_type == "logreg":
-                model_parser.add_argument("--save_name", type=str, default=f'Logreg_model', help="Filename for saved model")
-                model_parser.add_argument("--max_iter", type=int, default=1000, help="Max iterations for logistic regression")
+                model_parser.add_argument(
+                    "--save_name",
+                    type=str,
+                    default=f'Logreg_model',
+                    help="Filename for saved model"
+                    )
+                model_parser.add_argument(
+                    "--max_iter",
+                    type=int,
+                    default=1000,
+                    help="Max iterations for logistic regression"
+                    )
             
             elif known_args.model_type == "rf":
-                model_parser.add_argument("--save_name", type=str, default=f'rf_model', help="Filename for saved model")
+                model_parser.add_argument(
+                    "--save_name",
+                    type=str,
+                    default=f'rf_model',
+                    help="Filename for saved model"
+                    )
 
         # Predict-specific arguments
         elif known_args.command == 'predict':
-            model_parser.add_argument("--model_file", type=str, required=True, help="Model file to use for prediction")
-            model_parser.add_argument("--model_dir", type=str, default="./models", help="Directory to load the model from")
-            model_parser.add_argument("--data_dir", type=str, default="./data", help="Data directory")
-            model_parser.add_argument("--data", type=str, required=True, help="Data file")
-            model_parser.add_argument("--target", type=str, default="label", help="Target column for prediction")
-            model_parser.add_argument("--save_name", type=str, default="Prediction", help="Filename for saved predictions")
-            model_parser.add_argument("--save_type", type=str, choices=['csv', 'pkl'], default='pkl', help="Save predictions as CSV or pickle")
-            model_parser.add_argument("--remove_label", action="store_false", help="Remove 'label' column from prediction data")
-            model_parser.add_argument("--save_dir", type=str, default="./predictions", help="Directory to save predictions")
+            model_parser.add_argument(
+                "--model_file",
+                type=str,
+                required=True,
+                help="Model file to use for prediction"
+                )
+            model_parser.add_argument(
+                "--model_dir",
+                type=str,
+                default="./models",
+                help="Directory to load the model from"
+                )
+            model_parser.add_argument(
+                "--data_dir",
+                type=str,
+                default="./data",
+                help="Data directory"
+                )
+            model_parser.add_argument(
+                "--data",
+                type=str,
+                required=True,
+                help="Data file"
+                )
+            model_parser.add_argument(
+                "--target",
+                type=str,
+                default="label",
+                help="Target column for prediction"
+                )
+            model_parser.add_argument(
+                "--save_name",
+                type=str,
+                default="Prediction",
+                help="Filename for saved predictions"
+                )
+            model_parser.add_argument(
+                "--save_type",
+                type=str,
+                choices=['csv', 'pkl'],
+                default='pkl', help="Save predictions as CSV or pickle"
+                )
+            model_parser.add_argument(
+                "--remove_label",
+                action="store_false",
+                help="Remove 'label' column from prediction data"
+                )
+            model_parser.add_argument(
+                "--save_dir",
+                type=str,
+                default="./predictions",
+                help="Directory to save predictions"
+                )
 
     args = parser.parse_args()
 
@@ -1055,6 +1208,8 @@ def parse_arguments():
                 create_dir_if_not_exists(args.save_dir)
 
     return args
+
+# Old code to parse arguments, now replaced by parse_arguments()
 
 # def _parse_arguments():
 #     parser = argparse.ArgumentParser(description="Flexible ML model training and prediction")

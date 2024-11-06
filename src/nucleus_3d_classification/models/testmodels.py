@@ -1,3 +1,8 @@
+'''
+The below code was useed to test the functionality of the lightning module.
+It should not be used for any other purpose.
+'''
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

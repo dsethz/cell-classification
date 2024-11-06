@@ -1,3 +1,9 @@
+'''
+This script is used to visualize the 3D images and segmentation masks using napari, and to draw a rectangle
+around the existing crop region. This script is a remnant of the initial exploration phase of the project and
+is not used in the final pipeline. It is kept here for reference purposes.
+'''
+
 import napari
 import numpy as np
 import tifffile as tiff

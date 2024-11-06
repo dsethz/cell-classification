@@ -1,12 +1,25 @@
-import torch
-import numpy as np
+'''
+Module for calculating class weights and creating (un-)weighted loss functions for the model.
+The balanced weighting calculates the inverse of class frequencies from the training labels.
+Functions:
+    calculate_class_weights(setup_file):
+        Calculate and normalize class weights from a setup file containing training label information.
+    create_loss_fn_with_weights(setup_file, loss_fn, weight=None):
+        Create a weighted loss function using class weights derived from the training label file within the setup file.
+
+Old, unused functions:       
+    _calculate_class_weights(dataloader):
+        Calculate and normalize class weights from a dataloader's label distribution.
+    _create_loss_fn_with_weights(dataloader, loss_fn, weight=None):
+        Create a weighted loss function using class weights derived from a dataloader.
+'''
+
 import torch.nn.functional as F
 import json
-    
-
-import json
 import numpy as np
 import torch
+
+
 
 def calculate_class_weights(setup_file):
     """
@@ -38,7 +51,7 @@ def calculate_class_weights(setup_file):
             labels = json.load(f)
 
         for key, value in labels.items():
-            if value['ctype'] == 'megakaryocytic':
+            if value['ctype'] == 'megakaryocytic': # This is a remnant from having a 'megakaryocytic' label
                 label_counts['positive'] += 1
             if value['ctype'] == 'positive':
                 label_counts['positive'] += 1

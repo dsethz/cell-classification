@@ -52,6 +52,7 @@ cell-classification/
 ├── src/
 │   └── nucleus_3d_classification/
 │       ├── preprocess/         # Scripts for dataset generation and ground-truth creation
+│       ├── baseline/           # Script to fit baseline models on 2D as well as 3D extracted features, with setup files
 │       ├── utils/              # Dataset preparation, transformations, and loss functions
 │       ├── models/             # Model architectures (ResNet support)
 │       └── main.py             # Main entry point for model training

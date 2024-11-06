@@ -1,3 +1,9 @@
+'''
+This file contains the definition of a PyTorch Lightning DataModule for testing purposes.
+It generates random synthetic data for a binary classification task.
+It should not be used for anything other than testing purposes.
+'''
+
 import torch
 import pytorch_lightning as pl
 import lightning as L

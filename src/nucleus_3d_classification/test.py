@@ -1,3 +1,5 @@
+# Description: Test the CustomDataModule class and the CustomDataset class.
+
 from utils.datamodule import CustomDataset, CustomDataModule
 from utils.transform import rotate_invert
 import matplotlib.pyplot as plt

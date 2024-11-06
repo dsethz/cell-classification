@@ -1,14 +1,18 @@
-# This script generates cutouts from 3D image data based on provided mask coordinates. 
-# It takes mask coordinate data from a pickled file and applies it to a TIFF image (nucleus channel), 
-# extracting the relevant 3D regions as mask cutouts and saving them as TIFF files. 
-# Additionally, it calculates and saves metadata about the cutout sizes and properties into a JSON file.
+'''
+This script generates cutouts from 3D image data based on provided mask coordinates. 
+It takes mask coordinate data from a pickled file and applies it to a TIFF image (nucleus channel), 
+extracting the relevant 3D regions as mask cutouts and saving them as TIFF files. 
+Additionally, it calculates and saves metadata about the cutout sizes and properties into a JSON file.
 
-# Argument parser setup
-# Defines command-line arguments for:
-# - `mask_coordinates_path`: Path to the pickled mask coordinate dictionary.
-# - `image_path`: Path to the TIFF image that contains the 3D data (nucleus channel).
-# - `out_path`: Output directory where cutout files and metadata will be saved.
+Argument parser setup
+Defines command-line arguments for:
+- `mask_coordinates_path`: Path to the pickled mask coordinate dictionary.
+- `image_path`: Path to the TIFF image that contains the 3D data (nucleus channel).
+- `out_path`: Output directory where cutout files and metadata will be saved.
 
+Example usage:
+python generate_crops.py --mask_coordinates_path /path/to/mask_coordinates.pkl --image_path /path/to/image.tif --out_path /path/to/output
+'''
 
 import os
 import numpy as np

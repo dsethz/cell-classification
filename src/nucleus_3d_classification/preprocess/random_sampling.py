@@ -1,3 +1,19 @@
+'''
+This script performs random sampling of masks from a given mask coordinate dictionary and saves the sampled masks.
+Functions:
+    reconstruct_arr_from_dict(arr_shape, coordinates):
+        Reconstructs the mask array from the dictionary of mask coordinates.
+    main():
+        Main function to parse arguments, load data, perform random sampling, and save the sampled masks.
+Arguments:
+    --mask_coordinates_path (str): Filepath where the pickled mask coordinate dictionary is saved (after filtering).
+    --mask_array_path (str): Filepath where the mask array (after manual curation) is saved.
+    --n_count (int): Number of masks to sample.
+    --out_path (str): Path to output directory.
+Usage:
+    python random_sampling.py --mask_coordinates_path <path_to_mask_coordinates> --mask_array_path <path_to_mask_array> --n_count <number_of_masks> --out_path <output_directory>
+'''
+
 import os
 import numpy as np
 import pickle

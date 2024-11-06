@@ -1,3 +1,14 @@
+'''
+This module contains custom PyTorch transformations for 3D image data.
+These transformations can be used to augment the data during training.
+
+The following transformations are implemented:
+- pad: Pads the input tensor to the specified target size.
+- scale: Scales the input image intensities to the specified range.
+- normalize: Normalizes the input image intensities using the specified mean and standard deviation.
+- rotate_invert: Applies random rotations and inversions to the input 3D image.
+'''
+
 import torch.nn.functional as F
 import torch
 from torchvision.transforms import v2

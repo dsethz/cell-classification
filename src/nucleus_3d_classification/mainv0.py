@@ -1,11 +1,4 @@
-######################################################################################################################
-# This script coordinates training and testing of cell segmentation with Pytorch Lightning                           #
-# Author:               Aurimas Greicius, Daniel Schirmacher                                                         #
-#                       Cell Systems Dynamics Group, D-BSSE, ETH Zurich                                              #
-# Python Version:       3.12.2                                                                                       #
-# PyTorch Version:      2.3.1                                                                                        #
-# PyTorch Lightning Version: 2.3.1                                                                                   #
-######################################################################################################################
+# Out of date main script, simply for reference
 
 import os
 import sys

@@ -1,11 +1,53 @@
-# Mask Coord Dict is a dictionary that stores the coordinates of the masks in the labels layer,
-# generated from 'generate_mask_coord_dict.py', found at:
-# 'https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py'.
-# This file is not required, but it greatly improves the efficiency of the curation process by
-# allowing the user to jump to the next mask directly, speeding up the process.
+'''
+This script provides a Napari-based tool for curation and labelling of 3D cell segmentation masks. 
+It allows users to load mask coordinate dictionaries, navigate through masks, assign cell types, 
+and save/load mask dictionaries.
 
-# Mask Dictionary is a dictionary that stores the cell type (under 'ctype') and centroid of each mask.
-# The cell type is assigned by the user, and the centroid is calculated from the mask coordinates (from the pickle dictionary file, if provided!).
+Functions:
+- update_brush_size(size): Updates the brush size of the active labels layer.
+- save_mask_array(labels_layer): Saves the mask array to a temporary file every 10th mask.
+- select_labels_layer(labels_layer): Selects the labels layer and initializes mask IDs and centroids.
+- center_on_mask(labels_layer, mask_id): Centers the viewer on a specific mask and updates its centroid.
+- next_mask(event=None): Moves to the next mask in the list.
+- previous_mask(event=None): Moves to the previous mask in the list.
+- jump_to_mask(): Jumps to a specific mask based on user input.
+- assign_cell_type(cell_type): Assigns a cell type to the current mask.
+- filter_masks_by_label(label): Filters masks by the selected label.
+- next_filtered_mask(event=None): Moves to the next filtered mask.
+- previous_filtered_mask(event=None): Moves to the previous filtered mask.
+- save_mask_dict(): Saves the mask dictionary to a JSON file.
+- load_mask_dict(): Loads the mask dictionary from a JSON file.
+- load_mask_dict_jump(): Loads the mask coordinate dictionary from a pickle file.
+
+Widgets:
+- Load Mask Coord Dict (Pickle): Button to load mask coordinate dictionary.
+- Select Labels Layer: Widget to select the labels layer.
+- Assign Cell Type: Widget to assign cell types to masks.
+- Next Mask: Button to move to the next mask.
+- Previous Mask: Button to move to the previous mask.
+- Save Mask Dictionary JSON: Button to save the mask label dictionary to a JSON file.
+- Load Mask Dictionary JSON: Button to load the mask label dictionary from a JSON file.
+- Filter Masks by Label: Widget to filter masks by label.
+- Next Filtered Mask: Button to move to the next filtered mask.
+- Previous Filtered Mask: Button to move to the previous filtered mask.
+- Jump to Mask: Widget to jump to a specific mask by ID.
+
+Hotkeys:
+- 'r': Move to the next mask.
+- 'f': Move to the previous mask.
+- 'q', 'w', 'e': Assign cell types or update brush size depending on the mode.
+
+Mask Coord Dict is a dictionary that stores the coordinates of the masks in the labels layer,
+generated from 'generate_mask_coord_dict.py', found at:
+'https://github.com/CSDGroup/3d_segmentation/blob/main/scripts/generate_mask_coord_dict.py'
+This file is not required, but it greatly improves the efficiency of the curation process by
+allowing the user to jump to the next mask directly, speeding up the process.
+
+Mask Dictionary is a dictionary that stores the cell type (under 'ctype') and centroid of each mask.
+The cell type is assigned by the user, and the centroid is calculated from the
+mask coordinates (from the pickle dictionary file, if provided!).
+'''
+
 
 import json
 import os

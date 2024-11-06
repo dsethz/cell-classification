@@ -1,4 +1,44 @@
-# TODO: FIX THIS, and add docstrings
+'''
+This module provides utilities for handling 3D nucleus classification data using PyTorch and PyTorch Lightning.
+Classes:
+    CustomDataset: A custom PyTorch Dataset for loading and transforming 3D nucleus images and their labels.
+    CustomDataModule: A PyTorch Lightning DataModule for managing training, validation, and test datasets.
+Functions:
+    process_labels(label_file): Processes a JSON label file and returns a dictionary of labels.
+    convert_to_list(data): Converts a string to a list containing that string, or returns the list if already a list.
+    create_combined_dataset(data_list, target_size): Creates and combines multiple CustomDataset objects into a single dataset.
+    main(): Main function for testing and profiling the data module.
+CustomDataset:
+    __init__(self, label_file, crop_dir, target_size=[35,331,216]):
+        Initializes the CustomDataset with the given label file, crop directory, and target size.
+    __len__(self):
+        Returns the number of samples in the dataset.
+    __getitem__(self, idx):
+        Retrieves the image and label for the given index, applies transformations, and returns them.
+CustomDataModule:
+    __init__(self, setup_file=None, target_size=[35,331,216], batch_size:int = None, num_workers:int = None, stage: str = None):
+        Initializes the CustomDataModule with the given setup file, target size, batch size, number of workers, and stage.
+    setup(self, stage=None):
+        Sets up the training, validation, and test datasets based on the stage.
+    train_dataloader(self):
+        Returns a DataLoader for the training dataset.
+    val_dataloader(self):
+        Returns a DataLoader for the validation dataset.
+    test_dataloader(self):
+        Returns a DataLoader for the test dataset.
+    predict_dataloader(self):
+        Returns a DataLoader for the prediction dataset.
+    teardown(self, stage: str) -> None:
+        Tears down the data module for the given stage.
+    train_dataset(self):
+        Returns the training dataset.
+    val_dataset(self):
+        Returns the validation dataset.
+    test_dataset(self):
+        Returns the test dataset.
+    predict_dataset(self):
+        Returns the prediction dataset.
+'''
 
 import os
 import json
