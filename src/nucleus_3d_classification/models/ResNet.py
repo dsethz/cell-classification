@@ -332,13 +332,7 @@ class testNet(L.LightningModule):
                 loss_fn = 'cross_entropy', scheduler_type=None, step_size=10, gamma=0.9, leaky=True):
         super().__init__()
         '''
-        This class is the ResNet model. It consists of an initial convolutional layer, 4 residual blocks and a final fully connected layer.
-        The default parameters are the same as in the Pytorch implementation of ResNet at https://github.com/pytorch/vision/blob/main/torchvision/models/resnet.py,
-        checked at 2024-09-18, using the stride for downsampling at the second 3x3x3 convolution, additionally, the model is adapted to work with 3D data,
-        using 3D convolutions instead of 2D and a leakyReLU is default instead of the normal ReLU.
-        The model can be modified to have a different number of layers in each block, by changing the layers parameter, as well as allowing the ceil_mode
-        parameter to be set to True or False for the max pooling layer (for odd inputs). An extra padding layer can be added after the max pooling layer
-        to ensure that the data is the correct size for the first residual block.
+        This class was defined for testing purposes. It should not be used.
         '''
 
         # Variables
@@ -588,8 +582,6 @@ class testNet(L.LightningModule):
 
 # TODO : REMOVE BELOW, JUST FOR TESTING
 
-# from torchvision.transforms import pad_to_shape
-
 def main():
     model = ResNet(block=Block, layers=[2,2,1,1], num_classes=2, image_channels=1, 
                 padding_layer_sizes=(2,2,4,3,7,7)) # TODO: Make this padding adaptive and change it to 48 48 48, but stride 1 for z before
@@ -602,23 +594,6 @@ def main():
     print(output.shape)
     #print(output)
 
-# Before avg pool torch.Size([2, 1024, 5, 10, 11])
-# After avg pool torch.Size([2, 1024, 1, 1, 1])
-# Reshaping it to torch.Size([2, 1024])
-# Using a linear layer to get torch.Size([2, 2])
-
-# // Input shape: torch.Size([2, 1, 34, 164, 174])
-# After Conv1: torch.Size([2, 64, 17, 82, 87])
-# After MaxPool: torch.Size([2, 64, 9, 42, 44])
-# After padding: torch.Size([2, 64, 48, 48, 48])
-# After Conv2_x: torch.Size([2, 256, 48, 48, 48])
-# After Conv3_x: torch.Size([2, 512, 24, 24, 24])
-# After Conv4_x: torch.Size([2, 1024, 12, 12, 12])
-# After Conv5_x: torch.Size([2, 2048, 6, 6, 6])
-# After AvgPool: torch.Size([2, 2048, 1, 1, 1])
-# After Reshape: torch.Size([2, 2048])
-# After FC: torch.Size([2, 2])
-# torch.Size([2, 2])
 
 if __name__ == '__main__':
     main()

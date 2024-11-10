@@ -56,7 +56,7 @@ cell-classification/
 │       ├── utils/              # Dataset preparation, transformations, and loss functions
 │       ├── models/             # Model architectures (ResNet support)
 │       └── main.py             # Main entry point for model training
-└── setup_json/                 # Example JSON configurations for NN training, including model_runner setup
+└── setup_json/                 # Example JSON configurations for NN custom datamodule setup as well as model_runner setup
 ```
 
 ### Folder Details

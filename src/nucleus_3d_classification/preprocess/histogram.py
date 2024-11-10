@@ -12,6 +12,13 @@ Arguments:
     --mask_array_path (str): Filepath where the mask array (after manual curation) is saved.
     --multiplier (int): The number of negative masks per megakaryocyte to sample.
     --out_path (str): Path to output directory.
+
+The output files are saved in both .pkl and .tif formats (the pickled dictionary and the reconstructed mask array, respectively).
+The output files include:
+    - Megakaryocyte masks
+    - Negative masks
+    - Negative masks subset
+    - Combined masks (megakaryocyte masks and negative masks subset)
 '''
 
 import os
@@ -77,10 +84,10 @@ def main():
     path_out = args.out_path
     mask_coordinates_path = args.mask_coordinates_path
     mask_array_filtered_path = args.mask_array_path
-    megakaryocyte_masks_path = args.mega_path
-    negative_masks_path = args.negative_all_path
-    negative_masks_subset_path = args.negative_subset_path
-    combined_masks_path = args.neg_subset_and_mega_path
+    # megakaryocyte_masks_path = args.mega_path
+    # negative_masks_path = args.negative_all_path
+    # negative_masks_subset_path = args.negative_subset_path
+    # combined_masks_path = args.neg_subset_and_mega_path
     multiplier = args.multiplier
 
     # Load the filtered mask array

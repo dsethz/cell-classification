@@ -1,7 +1,3 @@
-# This script fits models to the 2D and 3D features extracted using the script 'extract_2D_3D_features.py'.
-# This scrip will take in a single parameter, a json file, stating which data to use for training, validation and testing.
-# Based on this, it will generate the output - result.csv files, containing the accuracies and other metrics for the models on both, the validation and test sets.
-# Additionally, all the models generated will be saved in a directory, that will be specified in the json file (based on the label, eg cd41, gata1, etc.).
 
 # Import necessary libraries
 import os
