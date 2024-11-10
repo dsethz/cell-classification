@@ -64,10 +64,3 @@
         ]
     }
 }
-
-
-// --model_type nn --command train --data /cluster/project/schroeder/AG/CD41/data/Training/CD41_setup.json --model_class ResNet50 --batch_size 4 --enable_progress_bar True --loss_weight balanced --data_module CustomDataModule --model_file .../ --stage test --save_dir .../
-
-// This below works
-//cd D:\AG\cell-classification-main\cell-classification-main\src\nucleus_3d_classification
-//python main.py --model_type nn --command predict --data D:\AG\setup_json\cd41_setup.json --model_class ResNet50 --batch_size 4 --enable_progress_bar --loss_weight balanced --data_module CustomDataModule --model_file N:\schroeder\Data\AG\Euler\best_models\CD412_best-f1_score-epoch=18-val_f1=0.92.ckpt --stage test --save_dir D:\AG\out
