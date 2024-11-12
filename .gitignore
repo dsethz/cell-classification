@@ -106,3 +106,7 @@ src/nucleus_3d_classification/preprocess/crop_napari.py
 src/testing.ipynb
 /test_output
 Analysis/test_models.ipynb
+Analysis/_outdated
+DELETE.py
+formatted_metrics.csv
+metrics_summary.txt
