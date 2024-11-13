@@ -580,8 +580,6 @@ class testNet(L.LightningModule):
 
 ######################################################################################################################
 
-# TODO : REMOVE BELOW, JUST FOR TESTING
-
 def main():
     model = ResNet(block=Block, layers=[2,2,1,1], num_classes=2, image_channels=1, 
                 padding_layer_sizes=(2,2,4,3,7,7)) # TODO: Make this padding adaptive and change it to 48 48 48, but stride 1 for z before

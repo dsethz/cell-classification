@@ -14,7 +14,7 @@ This script provides a flexible command-line interface for training and predicti
 including neural networks (nn), logistic regression (logreg), and random forests (rf).
 
 Usage:
-    python script_name.py --model_type <model_type> --command <command> [options]
+    python main.py --model_type <model_type> --command <command> [options]
 
 Model Types:
     - nn: Neural Network
@@ -27,17 +27,17 @@ Commands:
 
 Examples:
     1. Train a neural network with custom ResNet layers:
-       python script_name.py --model_type nn --command train --data setup.json --model_class ResNet_custom_layers --layers 4 1 2 2 --datamodule CustomDataModule --batch_size 32
+       python main.py --model_type nn --command train --data setup.json --model_class ResNet_custom_layers --layers 4 1 2 2 --datamodule CustomDataModule --batch_size 32
 
     2. Train a logistic regression model:
-       python script_name.py --model_type logreg --command train --data train_data.csv
+       python main.py --model_type logreg --command train --data train_data.csv
 
     3. Make predictions with a trained random forest model:
-       python script_name.py --model_type rf --command predict --model_file rf_model.pkl --data test_data.csv
+       python main.py --model_type rf --command predict --model_file rf_model.pkl --data test_data.csv
 
 For more detailed information on available options for each model type and command,
 use the --help flag:
-    python script_name.py --model_type <model_type> --command <command> --help
+    python main.py --model_type <model_type> --command <command> --help
 
 The naming of the options was kept as close as possible to resemble the PyTorch Lightning Trainer and other class options.
 For NN models, the following options are of general importance:
@@ -77,7 +77,14 @@ For NN models, the following options are of general importance:
     - --limit_val_batches: Limit validation batches
     - --limit_test_batches: Limit test batches
     - --limit_predict_batches: Limit predict batches
-    - --log_every_n_steps: Log every n steps
+    - --log_every_n_steps: Log every n step
+    - --save_type: Save type for predictions (csv, pkl) This saves the logged metrics in the specified format.
+
+    
+# Output of predictions as csv looks something like this:
+    test_loss_epoch,test_tp,test_tn,test_fp,test_fn,test_accuracy,test_precision,test_recall,test_f1
+    0.057498764246702194,35.0,1193.0,2.0,19.0,0.9831865429878235,0.9459459185600281,0.6481481194496155,0.7692307829856873
+
 
 Extra examples for Stochastic Weight Averaging and Learning Rate Finder arguments:
 
@@ -129,6 +136,7 @@ from lightning.pytorch.profilers import SimpleProfiler, AdvancedProfiler
 # import tensorboard
 
 class SklearnModelWrapper:
+    """Wrapper class for scikit-learn models."""
     def __init__(self, model: BaseEstimator):
 
         if not isinstance(model, BaseEstimator):
@@ -147,6 +155,7 @@ def create_dir_if_not_exists(dir_path: str):
         os.makedirs(dir_path)
 
 def get_model(model_name: str, class_weight: Optional[str] = None, max_iter: int = 1000):
+    """Returns a model instance based on the model name and optional class weight."""
     class_weight = None if class_weight == "None" else class_weight
     if model_name == "rf":
         return SklearnModelWrapper(RandomForestClassifier(class_weight=class_weight))
@@ -155,6 +164,7 @@ def get_model(model_name: str, class_weight: Optional[str] = None, max_iter: int
 
 # NN model instance creation
 def get_nn_model(model_name: str, extra_args: dict = None):
+    """Returns a neural network model instance based on the model name and optional extra arguments."""
     if extra_args is None:
         extra_args = {}
 
@@ -184,6 +194,7 @@ def get_nn_model(model_name: str, extra_args: dict = None):
         )
 
 def get_nn_model_class(model_name: str):
+    """Returns a neural network model class based on the model name."""
     if model_name not in globals():
         raise ValueError(f"Model class {model_name} not found, or input is not valid.\nPlease use one of the following: {list(globals().keys())}") # TODO: Check if this is correct
     # Return Class object, not instance
@@ -206,6 +217,7 @@ def get_nn_model_class(model_name: str):
     return model
 
 def load_data(data_dir: str, data_file: str, target: str = 'label'):
+    """Loads data from a CSV file and returns the feature matrix X and target vector y."""
     data_path = os.path.join(data_dir, data_file)
     if data_file.endswith('.csv'):
         data = pd.read_csv(data_path)
@@ -219,6 +231,7 @@ def load_data(data_dir: str, data_file: str, target: str = 'label'):
     return X, y
 
 def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
+    """Loads prediction data from a CSV file and returns the feature matrix X."""
     data_path = os.path.join(data_dir, data_file)
     if not data_file.endswith('.csv'):
         raise ValueError("Prediction data must be a CSV file")
@@ -233,6 +246,7 @@ def load_predict_data(data_dir: str, data_file: str, remove_label: bool = True):
     return data
 
 def train_sklearn_model(model, X, y, save_name: str, save_dir: str = "./models"):
+    """Trains a scikit-learn model and saves it to a file."""
     if not isinstance(model, SklearnModelWrapper):
         raise ValueError("Model must be a SklearnModelWrapper instance")
     model.fit(X, y)
@@ -242,6 +256,7 @@ def train_sklearn_model(model, X, y, save_name: str, save_dir: str = "./models")
             pickle.dump(model, f)
 
 def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictions", save_type: str = 'csv'):
+    """Makes predictions with a scikit-learn model and saves them to a file."""
     if not isinstance(model, SklearnModelWrapper):
         raise ValueError("Model must be a SklearnModelWrapper instance")
     y = model.predict(X)
@@ -259,7 +274,7 @@ def predict_sklearn_model(model, X, save_name: str, save_dir: str = "./predictio
     return y
 
 def extract_arguments(text):
-
+    """Extracts key=value pairs from a string and returns them as a dictionary."""
     if isinstance(text, list):
         # Join the list into a single string
         text = " ".join(text)
@@ -274,6 +289,7 @@ def extract_arguments(text):
     return arguments
 
 def convert_types(arguments):
+    """Converts string values to integers or floats if possible."""
     for key, value in arguments.items():
         if value.startswith('[') and value.endswith(']'):
             # Convert string list to actual list
@@ -298,7 +314,7 @@ def convert_types(arguments):
     return arguments
 
 def define_callbacks(args, callback_names: list):
-
+    """Defines and returns a list of PyTorch Lightning callbacks based on the provided arguments."""
     callbacks = []
     for callback_name in callback_names if callback_names is not None else []:
         if callback_name == "early_stopping":
@@ -393,6 +409,7 @@ def define_callbacks(args, callback_names: list):
     return callbacks
 
 class FineTuneLearningRateFinder(LearningRateFinder):
+    """Implements a learning rate finder callback with fine-tuning capabilities."""
     def __init__(self, milestones=0, min_lr:float=1e-6, max_lr: float= 0.1, num_training_steps: int = 100, mode: str ='cos', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.milestones = milestones
@@ -413,6 +430,7 @@ class FineTuneLearningRateFinder(LearningRateFinder):
             self.lr_find(trainer, pl_module)
 
 def create_checkpoint_callback(args):
+    """Creates a model checkpoint callback based on the provided arguments."""
     args.filename = replace_filename(args)
 
     # Dirpath -> check if exists, if not, create it
@@ -422,6 +440,8 @@ def create_checkpoint_callback(args):
     # Default is "model_name_data_module_name-{epoch:02d}-{val_loss:.2f}"
 
 def replace_filename(args):
+    """Replaces placeholders in the filename with actual values."""
+    # NOT FULLY TESTED, USE WITH CAUTION
     filename = args.filename
     filename = filename.replace("model_name", args.model_class)
     filename = filename.replace("data_module_name", args.data_module)
@@ -433,6 +453,7 @@ def replace_filename(args):
     return filename
 
 def clean_filename(filename):
+    """Replaces special characters in a filename with underscores."""
     # Set of special characters to be replaced with an underscore
     #special_chars = {'/', '\\', ':', '*', '?', '"', '<', '>', '|', "'", '!', '@', '#', '$', '%', '^', '&', '(', ')', '+', '=', '{', '}', '[', ']', ';', ',', '.', '`', '~', ' '}
     special_chars = {"'", '"', '/', '\\', ' '}
@@ -440,6 +461,7 @@ def clean_filename(filename):
     return re.sub(r'[{}]'.format(re.escape(''.join(special_chars))), '_', filename)
 
 class FineTuneBatchSizeFinder(BatchSizeFinder):
+    """Implements a batch size finder callback with fine-tuning capabilities."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -451,6 +473,7 @@ class FineTuneBatchSizeFinder(BatchSizeFinder):
             self.scale_batch_size(trainer, pl_module)
 
 def define_trainer(args, callbacks=None):
+    """Defines and returns a PyTorch Lightning Trainer based on the provided arguments."""
     trainer_kwargs = {
         'profiler': args.profiler,
         'enable_progress_bar': args.enable_progress_bar,
@@ -476,6 +499,7 @@ def define_trainer(args, callbacks=None):
     return L.Trainer(**trainer_kwargs)
 
 def load_data_module(args):
+    """Loads a data module based on the provided arguments."""
     if args.data_module == "BaseDataModule":
         if not hasattr(args, 'batch_size') or (hasattr(args, 'batch_size') and args.batch_size is None):
             print("No batch size provided, using default batch size of 32")
@@ -530,6 +554,7 @@ def load_data_module(args):
 
 
 def train_nn_model(args):
+    """Trains a neural network model based on the provided arguments."""
     # data_module = load_data_module(args)
     #print(f"train loader is type {type(data_module.train_dataloader())}")
     loss_fn = create_loss_fn_with_weights(setup_file=args.setup_file, loss_fn=args.loss_fn, weight=args.loss_weight)
@@ -650,6 +675,7 @@ def train_nn_model(args):
 #################### MEMORY PROFILING ####################
 
 def predict_nn_model(args):
+    """Makes predictions with a neural network model based on the provided arguments."""
     model_class = get_nn_model_class(args.model_class)
 
     # Define possible paths and file names to attempt loading
@@ -704,6 +730,7 @@ def predict_nn_model(args):
     print("Predictions complete")
 
 def save_predictions(predictions, args):
+    """Saves predictions to a file based on the provided arguments."""
     create_dir_if_not_exists(args.save_dir)
     save_path = os.path.join(args.save_dir, f"{args.save_name}.{args.save_type}")
 
@@ -716,6 +743,7 @@ def save_predictions(predictions, args):
     print(f"Predictions saved to {save_path}")
 
 def parse_arguments():
+    """Parses command-line arguments and returns the parsed arguments."""
 
     # First-pass parser to determine model_type and command
     top_parser = argparse.ArgumentParser(
@@ -1033,7 +1061,7 @@ def parse_arguments():
                 "--save_type", 
                 type=str, 
                 choices=['csv', 'pkl'],
-                default='pkl', 
+                default='csv', 
                 help="File format to save predictions"
                 )
             nn_parser.add_argument(
@@ -1041,7 +1069,7 @@ def parse_arguments():
                 type=str, 
                 default=None,
                 choices={"test", "predict", "validate"}, 
-                help="Which dataloader to use (as defined in datamodule)?"
+                help="This argument defines whether you want to use the test/validation/prediction dataloader, defined in the DataModule"
                 ) # This defines whether to use the validation or test dataloader for prediction.
 
     # Add arguments specific to logistic regression (logreg) and random forest (rf)

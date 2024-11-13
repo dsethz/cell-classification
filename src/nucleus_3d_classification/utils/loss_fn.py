@@ -26,7 +26,7 @@ def calculate_class_weights(setup_file):
     Calculate class weights based on the frequency of labels in the training dataset.
 
     Args:
-        setup_file (str): Path to the setup file containing the label file for training data.
+        setup_file (str): Path to the setup file containing the label file for training data. (This would be your --data argument)
 
     Returns:
         torch.Tensor: A tensor containing normalized class weights.

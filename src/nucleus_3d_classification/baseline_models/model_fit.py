@@ -25,6 +25,7 @@ from numba import prange
 
 # Function to detect diff columns and remove them, printing it out too.
 def remove_diff_columns(df1, df2, df3):
+    """Remove columns that are not present in all dataframes."""
     
     # Print out the columns to be removed:
     columns_to_remove = (set(df1.columns) - set(df2.columns)).union(
@@ -53,6 +54,7 @@ def remove_diff_columns(df1, df2, df3):
 # match the multiple files to the multiple JSON files,
 # and finally return one long dataframe with the data and labels.
 def load_data(data, labels):
+    """Load CSV data and match it to JSON labels."""
     # Ensure that the input is a list, even if a single string is provided
     if isinstance(data, str):
         data = [data]
@@ -109,6 +111,7 @@ def load_data(data, labels):
 
 # Clean the data, in case there are unexpected columns:
 def trim(x):
+    """Remove columns that are not useful."""
     # Remove columns that contain 'Identifier' or 'mask_id' in their names
     x = x.loc[:, ~x.columns.str.contains('Identifier', case=False, na=False)]
     x = x.loc[:, ~x.columns.str.contains('mask_id', case=False, na=False)]
@@ -129,7 +132,7 @@ def trim(x):
     return x
 
 def prep_trim_scale_data(train_data, val_data, test_data):
-
+    """Prepare, trim, and scale the data."""
     # Remove the columns that are not useful
     train_data = trim(train_data)
     val_data = trim(val_data)
@@ -156,6 +159,7 @@ def prep_trim_scale_data(train_data, val_data, test_data):
     return train_X, train_y, val_X, val_y, test_X, test_y
 
 def calc_metrics(y_true, model, X):
+    """Calculate metrics for the model."""
     y_pred = model.predict(X)
     test_proba = model.predict_proba(X)[:, 1]
     acc = accuracy_score(y_true, y_pred)
@@ -178,6 +182,7 @@ def calc_metrics(y_true, model, X):
 
 
 def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, feature_type= '3D'):
+    """Fit and evaluate a logistic regression model."""
     logreg_dir = os.path.join(output_dir, 'logreg')
     logreg_2d_dir = os.path.join(logreg_dir, '2d')
     logreg_3d_dir = os.path.join(logreg_dir, '3d')
@@ -283,7 +288,7 @@ def fit_eval_logreg(train_X, train_y, val_X, val_y, test_X, test_y, output_dir, 
             f.write(f"Test Confusion Matrix: {test_confusion_matrix_}\n")
 
 def rf_train(param_grid, output_dir, train_X, train_y, val_X, val_y, test_X, test_y, iters:int=3, feature_type='3D'):
-    
+    """Train and evaluate random forest models, based on provided iterations, hyperparameter grid."""
     rf_dir = os.path.join(output_dir, 'rf')
     rf_2d_dir = os.path.join(rf_dir, '2d')
     rf_3d_dir = os.path.join(rf_dir, '3d')

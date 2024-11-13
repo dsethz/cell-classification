@@ -1,3 +1,4 @@
+# NOT USED
 '''
 This file contains the definition of a PyTorch Lightning DataModule for testing purposes.
 It generates random synthetic data for a binary classification task.

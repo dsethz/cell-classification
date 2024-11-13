@@ -1,3 +1,4 @@
+# NOT USED
 '''
 This file contains the implementation of the custom accuracy metric.
 It was not used in the final pipeline, but was kept for reference purposes.

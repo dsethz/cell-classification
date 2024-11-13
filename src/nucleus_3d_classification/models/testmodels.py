@@ -1,3 +1,4 @@
+# NOT USED
 '''
 The below code was useed to test the functionality of the lightning module.
 It should not be used for any other purpose.

@@ -52,6 +52,14 @@ from utils.transform import scale, normalize, pad, rotate_invert
 import lightning as L
 
 class CustomDataset(torch.utils.data.Dataset):
+    """
+    Custom PyTorch Dataset for loading and transforming 3D nucleus images and their labels.
+    
+    args:
+        label_file: str - Path to the JSON file containing the labels for the images. (mask_id: {ctype: label, centroid: [x, y, z]})
+        crop_dir: str - Path to the directory containing the cropped 3D nucleus tif images.
+        target_size: list - Target size for the 3D images [depth, height, width].
+    """
     def __init__(self, label_file, crop_dir, target_size=[35,331,216]):
         
         self.label_file = label_file
@@ -119,6 +127,12 @@ class CustomDataset(torch.utils.data.Dataset):
     
 
 def process_labels(label_file):
+    """
+    Processes a JSON label file and returns a dictionary of labels.
+    
+    args:
+        label_file: str - Path to the JSON file containing the labels for the images. (mask_id: {ctype: label, centroid: [x, y, z]})
+    """
     try:
         with open(label_file, 'r') as f:
             
@@ -146,11 +160,22 @@ def process_labels(label_file):
     print(f"Error: Failed to load labels from {label_file}.")
 
 def convert_to_list(data):
+    """Converts a string to a list containing that string, or returns the list if already a list."""
     if isinstance(data, str):
         return [data]
     return data
 
 class CustomDataModule(L.LightningDataModule):
+    """
+    PyTorch Lightning DataModule for managing training, validation, and test datasets.
+    
+    args:
+        setup_file: str - Path to the JSON setup file containing the data configuration.
+        target_size: list - Target size for the 3D images [depth, height, width].
+        batch_size: int - Batch size for the DataLoader.
+        num_workers: int - Number of workers for the DataLoader.
+        stage: str - Stage of the data module (fit, validate, test, predict).
+    """
     def __init__(self,
                 setup_file=None,
                 target_size=[35,331,216],
@@ -226,7 +251,13 @@ class CustomDataModule(L.LightningDataModule):
         return self.test_data
     
 def create_combined_dataset(data_list, target_size):
-    """Helper function to create and combine datasets."""
+    """
+    Helper function to create and combine datasets.
+    
+    args:
+        data_list: list - List of dictionaries containing label_file and crop_dir paths.
+        target_size: list - Target size for the 3D images [depth, height, width].
+    """
     dataset_list = []
     
     # Check if data_list is a single file path or a list of file paths

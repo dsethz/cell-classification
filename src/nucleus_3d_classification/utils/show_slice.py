@@ -1,3 +1,4 @@
+# NOT USED
 # Description: Function to show a slice of an image
 import matplotlib.pyplot as plt
 import numpy as np
