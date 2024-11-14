@@ -1,10 +1,10 @@
 # Description: Test the CustomDataModule class and the CustomDataset class.
 
-from utils.datamodule import CustomDataset, CustomDataModule
-from utils.transform import rotate_invert
-import matplotlib.pyplot as plt
-from utils.show_slice import show_slice
-import torch
+from nucleus_3d_classification.utils.datamodule import CustomDataset, CustomDataModule
+from nucleus_3d_classification.utils.transform import rotate_invert
+# import matplotlib.pyplot as plt
+# from nucleus_3d_classification.utils.show_slice import show_slice
+# import torch
 
 def test():
     data_module = CustomDataModule(setup_file='/Users/agreic/Desktop/Project/Data/Raw/Training/setup.json', batch_size=2)
