@@ -37,20 +37,28 @@ This project was built with **Python 3.12.2** and may not support other Python v
     cd cell-classification
     ```
 
-2. Install Pytorch v2.3.1. The installation process depends on your OS as well as GPU availability. Refer to https://pytorch.org/get-started/previous-versions/ for details. For installation on OSX:
+2. Install Pytorch v2.3.1. The installation process depends on your OS as well as GPU availability. Refer to [PyTorch installation guide](https://pytorch.org/get-started/previous-versions/) for details. For installation on OSX:
+
     ```bash
     pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1
     ```
 
-For installation on Linux and Windows with CUDA or CPU-only, choose the appropriate option below:
-    ```bash
-    # CUDA 11.8
-    pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
-    # CUDA 12.1
-    pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu121
-    # CPU only
-    pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
-    ```
+   For installation on Linux and Windows with CUDA or CPU-only, choose the appropriate option below:
+
+   - **CUDA 11.8**:
+     ```bash
+     pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu118
+     ```
+
+   - **CUDA 12.1**:
+     ```bash
+     pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cu121
+     ```
+
+   - **CPU only**:
+     ```bash
+     pip install torch==2.3.1 torchvision==0.18.1 torchaudio==2.3.1 --index-url https://download.pytorch.org/whl/cpu
+     ```
 
 3. Install `cell-classification` via [pip]:
     ```bash
